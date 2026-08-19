@@ -8,9 +8,10 @@ import { colors } from '@/theme/colors';
 type RouteMapProps = {
   points: LocationPoint[];
   height?: number;
+  endLabel?: string;
 };
 
-export function RouteMap({ points, height = 220 }: RouteMapProps) {
+export function RouteMap({ points, height = 220, endLabel = 'Ahora' }: RouteMapProps) {
   const mapRef = useRef<MapView | null>(null);
 
   const coordinates = useMemo(
@@ -77,8 +78,23 @@ export function RouteMap({ points, height = 220 }: RouteMapProps) {
           <Polyline coordinates={coordinates} strokeColor={colors.accent} strokeWidth={5} />
         ) : null}
         <Marker coordinate={first} title="Inicio" pinColor={colors.success} />
-        {coordinates.length > 1 ? <Marker coordinate={last} title="Ahora" pinColor={colors.accent} /> : null}
+        {coordinates.length > 1 ? (
+          <Marker coordinate={last} title={endLabel} pinColor={colors.accent} />
+        ) : null}
       </MapView>
+
+      <View style={styles.legend}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, styles.startDot]} />
+          <Text style={styles.legendText}>Inicio</Text>
+        </View>
+        {coordinates.length > 1 ? (
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, styles.endDot]} />
+            <Text style={styles.legendText}>{endLabel}</Text>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -88,6 +104,34 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 22,
     backgroundColor: colors.surface,
+  },
+  legend: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 13,
+    backgroundColor: 'rgba(11,13,18,0.86)',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  legendDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+  },
+  startDot: { backgroundColor: colors.success },
+  endDot: { backgroundColor: colors.accent },
+  legendText: {
+    color: colors.text,
+    fontSize: 10,
+    fontWeight: '800',
   },
   empty: {
     alignItems: 'center',
