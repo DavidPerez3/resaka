@@ -69,7 +69,7 @@ export function RouteMap({ points, height = 220 }: RouteMapProps) {
   }
 
   return (
-    <View style={[styles.frame, { height }]}>
+    <View style={[styles.frame, { height }]} pointerEvents="none">
       {React.createElement('iframe', {
         title: 'Ruta de la salida',
         srcDoc,
@@ -79,6 +79,7 @@ export function RouteMap({ points, height = 220 }: RouteMapProps) {
           height: '100%',
           border: 0,
           display: 'block',
+          pointerEvents: 'none',
         },
       })}
     </View>
