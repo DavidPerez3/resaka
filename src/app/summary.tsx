@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { RouteMap } from '@/components/RouteMap';
+import { formatDistance } from '@/domain/route';
 import { buildOutingTimeline, formatTimelineTime } from '@/domain/timeline';
 import { useOutingSession } from '@/features/outing/OutingSessionContext';
 import { colors } from '@/theme/colors';
@@ -67,7 +69,7 @@ export default function SummaryScreen() {
     );
   }
 
-  const { outing } = lastFinishedOuting;
+  const { outing, routePoints } = lastFinishedOuting;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -90,17 +92,23 @@ export default function SummaryScreen() {
         <View style={styles.heroStats}>
           <Stat value={formatDuration(outing.startedAt, outing.endedAt)} label="Duración" wide />
           <Stat value={`${stats.total}`} label="Bebidas" />
-          <Stat value="0.0 km" label="Distancia" muted />
+          <Stat value={formatDistance(outing.distanceMeters)} label="Distancia" />
         </View>
 
-        <View style={styles.mapCard}>
-          <View style={styles.mapIcon}>
-            <Ionicons name="map-outline" color={colors.accent} size={30} />
+        <View style={styles.section}>
+          <View style={styles.sectionHeading}>
+            <Text style={styles.sectionEyebrow}>POR DÓNDE ACABASTE</Text>
+            <Text style={styles.sectionTitle}>Ruta</Text>
           </View>
-          <Text style={styles.mapTitle}>La ruta llega en el Bloque 3.</Text>
-          <Text style={styles.mapText}>
-            Ya tenemos la salida a salvo. Lo siguiente será registrar GPS, distancia y recorrido real.
-          </Text>
+          <RouteMap points={routePoints} height={235} />
+          <View style={styles.routeSummary}>
+            <Text style={styles.routeSummaryValue}>{formatDistance(outing.distanceMeters)}</Text>
+            <Text style={styles.routeSummaryText}>
+              {routePoints.length > 0
+                ? `${routePoints.length} puntos GPS guardados durante la salida.`
+                : 'Esta salida no tiene ruta GPS. Puede ser anterior a este bloque o haberse registrado sin permiso de ubicación.'}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -155,7 +163,7 @@ export default function SummaryScreen() {
           <View style={styles.savedCopy}>
             <Text style={styles.savedTitle}>Guardado en este dispositivo</Text>
             <Text style={styles.savedText}>
-              Puedes cerrar o recargar RESAKA: este resumen seguirá aquí. La sincronización entre dispositivos llegará con tu cuenta.
+              Bebidas, tiempos y ruta sobreviven a cierres y recargas. La sincronización entre dispositivos llegará con tu cuenta.
             </Text>
           </View>
         </View>
@@ -184,12 +192,12 @@ export default function SummaryScreen() {
   );
 }
 
-type StatProps = { value: string; label: string; wide?: boolean; muted?: boolean };
+type StatProps = { value: string; label: string; wide?: boolean };
 
-function Stat({ value, label, wide = false, muted = false }: StatProps) {
+function Stat({ value, label, wide = false }: StatProps) {
   return (
     <View style={[styles.stat, wide && styles.statWide]}>
-      <Text style={[styles.statValue, muted && styles.statValueMuted]}>{value}</Text>
+      <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
@@ -217,7 +225,7 @@ function BeerRow({ label, value }: { label: string; value: number }) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
-  container: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 42, gap: 22 },
+  container: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 48, gap: 22 },
   header: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
   closeButton: {
     width: 42,
@@ -245,31 +253,23 @@ const styles = StyleSheet.create({
   },
   statWide: { minWidth: 160 },
   statValue: { color: colors.text, fontSize: 20, fontWeight: '900' },
-  statValueMuted: { color: colors.textMuted },
   statLabel: { marginTop: 3, color: colors.textMuted, fontSize: 11, fontWeight: '700' },
-  mapCard: {
-    minHeight: 165,
-    padding: 19,
-    justifyContent: 'center',
-    borderRadius: 24,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  mapIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceRaised,
-  },
-  mapTitle: { marginTop: 12, color: colors.text, fontSize: 18, fontWeight: '900' },
-  mapText: { marginTop: 5, color: colors.textMuted, fontSize: 13, lineHeight: 19 },
   section: { gap: 13 },
   sectionHeading: { gap: 3 },
   sectionEyebrow: { color: colors.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.35 },
   sectionTitle: { color: colors.text, fontSize: 22, fontWeight: '900' },
+  routeSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  routeSummaryValue: { minWidth: 68, color: colors.text, fontSize: 17, fontWeight: '900' },
+  routeSummaryText: { flex: 1, color: colors.textMuted, fontSize: 11, lineHeight: 16 },
   drinkGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   drinkStat: {
     width: '48.5%',
