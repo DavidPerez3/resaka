@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, Tabs, useSegments } from 'expo-router';
+import { Redirect, Tabs, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -33,23 +33,13 @@ function RootTabs() {
   useEffect(() => {
     if (!isHydrated || !showCompletionSummary) return;
 
-    // useSegments() devuelve las rutas de Expo Router y no incluye el baseUrl
-    // físico de GitHub Pages (/resaka). Así este fallback funciona igual en
-    // web, Android e iOS.
-    if (!activeOuting && lastFinishedOuting && currentRoute === 'outing') {
-      router.replace('/summary');
-      return;
-    }
-
     if (segments.length === 0 || currentRoute === 'index') {
       dismissCompletionSummary();
     }
   }, [
-    activeOuting,
     currentRoute,
     dismissCompletionSummary,
     isHydrated,
-    lastFinishedOuting,
     segments.length,
     showCompletionSummary,
   ]);
@@ -62,6 +52,20 @@ function RootTabs() {
         <Text style={styles.loadingText}>Un segundo, estamos buscando las pruebas.</Text>
       </View>
     );
+  }
+
+  // Este redirect es deliberadamente síncrono. Al terminar una salida,
+  // activeOuting pasa a null en el mismo commit de React en el que queda
+  // disponible lastFinishedOuting. Devolver Redirect aquí evita que llegue
+  // a renderizarse durante un frame la pantalla vacía de /outing y funciona
+  // igual con el baseUrl /resaka de GitHub Pages.
+  if (
+    showCompletionSummary &&
+    !activeOuting &&
+    lastFinishedOuting &&
+    currentRoute === 'outing'
+  ) {
+    return <Redirect href="/summary" />;
   }
 
   return (
