@@ -1,11 +1,13 @@
 import type { DrinkEntry } from '@/domain/drinks';
 import type { Outing } from '@/domain/outings';
 import { calculateRouteDistance, isValidLocationPoint } from '@/domain/route';
+import type { OutingStop, Venue } from '@/domain/venues';
 import type {
   CompletedOuting,
   OutingSessionSnapshotV1,
   OutingSessionSnapshotV2,
   OutingSessionSnapshotV3,
+  OutingSessionSnapshotV4,
 } from '@/features/outing/types';
 import type { LocationPoint } from '@/services/location/types';
 
@@ -56,6 +58,43 @@ function isDrink(value: unknown): value is DrinkEntry {
   );
 }
 
+function isVenue(value: unknown): value is Venue {
+  if (!isRecord(value)) return false;
+  const validSource = value.source === 'OSM' || value.source === 'MANUAL';
+  const validCategory =
+    value.category === 'BAR' ||
+    value.category === 'PUB' ||
+    value.category === 'NIGHTCLUB' ||
+    value.category === 'BIERGARTEN' ||
+    value.category === 'OTHER';
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.name === 'string' &&
+    value.name.trim().length > 0 &&
+    typeof value.latitude === 'number' &&
+    Number.isFinite(value.latitude) &&
+    typeof value.longitude === 'number' &&
+    Number.isFinite(value.longitude) &&
+    validSource &&
+    validCategory &&
+    typeof value.createdAt === 'string'
+  );
+}
+
+function isStop(value: unknown, outingId: string): value is OutingStop {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === 'string' &&
+    value.outingId === outingId &&
+    typeof value.venueId === 'string' &&
+    typeof value.arrivedAt === 'string' &&
+    (value.departedAt === undefined || typeof value.departedAt === 'string') &&
+    typeof value.orderIndex === 'number' &&
+    Number.isFinite(value.orderIndex)
+  );
+}
+
 function sanitizeDrinks(value: unknown, outingId: string) {
   if (!Array.isArray(value)) return [];
   return value.filter((drink): drink is DrinkEntry => isDrink(drink) && drink.outingId === outingId);
@@ -80,6 +119,22 @@ function sanitizeRoutePoints(value: unknown): LocationPoint[] {
   });
 }
 
+function sanitizeVenues(value: unknown): Venue[] {
+  if (!Array.isArray(value)) return [];
+  const unique = new Map<string, Venue>();
+  for (const venue of value) {
+    if (isVenue(venue)) unique.set(venue.id, venue);
+  }
+  return Array.from(unique.values());
+}
+
+function sanitizeStops(value: unknown, outingId: string): OutingStop[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((stop): stop is OutingStop => isStop(stop, outingId))
+    .sort((left, right) => left.orderIndex - right.orderIndex);
+}
+
 function withRouteDistance(outing: Outing, routePoints: LocationPoint[]): Outing {
   return {
     ...outing,
@@ -87,14 +142,16 @@ function withRouteDistance(outing: Outing, routePoints: LocationPoint[]): Outing
   };
 }
 
-function sanitizeCompletedOuting(value: unknown, legacy = false): CompletedOuting | null {
+function sanitizeCompletedOuting(value: unknown, legacyRoute = false): CompletedOuting | null {
   if (!isRecord(value) || !isOuting(value.outing, 'FINISHED')) return null;
 
-  const routePoints = legacy ? [] : sanitizeRoutePoints(value.routePoints);
+  const routePoints = legacyRoute ? [] : sanitizeRoutePoints(value.routePoints);
   return {
     outing: withRouteDistance(value.outing, routePoints),
     drinks: sanitizeDrinks(value.drinks, value.outing.id),
     routePoints,
+    stops: sanitizeStops(value.stops, value.outing.id),
+    venues: sanitizeVenues(value.venues),
   };
 }
 
@@ -102,77 +159,79 @@ export function createOutingSessionSnapshot(input: {
   activeOuting: Outing | null;
   drinks: DrinkEntry[];
   routePoints: LocationPoint[];
+  stops: OutingStop[];
+  knownVenues: Venue[];
   lastFinishedOuting: CompletedOuting | null;
   showCompletionSummary: boolean;
-}): OutingSessionSnapshotV3 {
+}): OutingSessionSnapshotV4 {
   return {
-    version: 3,
+    version: 4,
     activeOuting: input.activeOuting,
     drinks: input.activeOuting
       ? input.drinks.filter((drink) => drink.outingId === input.activeOuting?.id)
       : [],
     routePoints: input.activeOuting ? input.routePoints : [],
+    stops: input.activeOuting
+      ? input.stops.filter((stop) => stop.outingId === input.activeOuting?.id)
+      : [],
+    knownVenues: input.knownVenues,
     lastFinishedOuting: input.lastFinishedOuting,
     showCompletionSummary: input.showCompletionSummary && Boolean(input.lastFinishedOuting),
   };
 }
 
-function restoreV1(value: Record<string, unknown>): OutingSessionSnapshotV3 {
-  const activeOuting = isOuting(value.activeOuting, 'ACTIVE') ? value.activeOuting : null;
-  const legacyLastFinished = sanitizeCompletedOuting(value.lastFinishedOuting, true);
-
-  return {
-    version: 3,
-    activeOuting: activeOuting ? withRouteDistance(activeOuting, []) : null,
-    drinks: activeOuting ? sanitizeDrinks(value.drinks, activeOuting.id) : [],
-    routePoints: [],
-    lastFinishedOuting: legacyLastFinished,
-    showCompletionSummary: false,
-  };
-}
-
-function restoreV2(value: Record<string, unknown>): OutingSessionSnapshotV3 {
-  const routePoints = sanitizeRoutePoints(value.routePoints);
+function restoreLegacy(value: Record<string, unknown>, version: 1 | 2 | 3): OutingSessionSnapshotV4 {
+  const routePoints = version === 1 ? [] : sanitizeRoutePoints(value.routePoints);
   const activeOuting = isOuting(value.activeOuting, 'ACTIVE')
     ? withRouteDistance(value.activeOuting, routePoints)
     : null;
+  const lastFinishedOuting = sanitizeCompletedOuting(value.lastFinishedOuting, version === 1);
 
   return {
-    version: 3,
+    version: 4,
     activeOuting,
     drinks: activeOuting ? sanitizeDrinks(value.drinks, activeOuting.id) : [],
     routePoints: activeOuting ? routePoints : [],
-    lastFinishedOuting: sanitizeCompletedOuting(value.lastFinishedOuting),
-    showCompletionSummary: false,
+    stops: [],
+    knownVenues: [],
+    lastFinishedOuting,
+    showCompletionSummary:
+      version === 3 && value.showCompletionSummary === true && Boolean(lastFinishedOuting),
   };
 }
 
-export function restoreOutingSessionSnapshot(value: unknown): OutingSessionSnapshotV3 {
-  const empty: OutingSessionSnapshotV3 = {
-    version: 3,
+export function restoreOutingSessionSnapshot(value: unknown): OutingSessionSnapshotV4 {
+  const empty: OutingSessionSnapshotV4 = {
+    version: 4,
     activeOuting: null,
     drinks: [],
     routePoints: [],
+    stops: [],
+    knownVenues: [],
     lastFinishedOuting: null,
     showCompletionSummary: false,
   };
 
   if (!isRecord(value)) return empty;
-  if (value.version === 1) return restoreV1(value as OutingSessionSnapshotV1 & Record<string, unknown>);
-  if (value.version === 2) return restoreV2(value as OutingSessionSnapshotV2 & Record<string, unknown>);
-  if (value.version !== 3) return empty;
+  if (value.version === 1) return restoreLegacy(value as OutingSessionSnapshotV1 & Record<string, unknown>, 1);
+  if (value.version === 2) return restoreLegacy(value as OutingSessionSnapshotV2 & Record<string, unknown>, 2);
+  if (value.version === 3) return restoreLegacy(value as OutingSessionSnapshotV3 & Record<string, unknown>, 3);
+  if (value.version !== 4) return empty;
 
   const routePoints = sanitizeRoutePoints(value.routePoints);
+  const knownVenues = sanitizeVenues(value.knownVenues);
   const activeOuting = isOuting(value.activeOuting, 'ACTIVE')
     ? withRouteDistance(value.activeOuting, routePoints)
     : null;
   const lastFinishedOuting = sanitizeCompletedOuting(value.lastFinishedOuting);
 
   return {
-    version: 3,
+    version: 4,
     activeOuting,
     drinks: activeOuting ? sanitizeDrinks(value.drinks, activeOuting.id) : [],
     routePoints: activeOuting ? routePoints : [],
+    stops: activeOuting ? sanitizeStops(value.stops, activeOuting.id) : [],
+    knownVenues,
     lastFinishedOuting,
     showCompletionSummary:
       value.showCompletionSummary === true && Boolean(lastFinishedOuting),
