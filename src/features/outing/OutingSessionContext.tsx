@@ -3,17 +3,20 @@ import {
   type PropsWithChildren,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
 
 import type { BeerSize, DrinkEntry, DrinkType } from '@/domain/drinks';
 import type { Outing } from '@/domain/outings';
-
-type CompletedOuting = {
-  outing: Outing;
-  drinks: DrinkEntry[];
-};
+import {
+  createOutingSessionSnapshot,
+  restoreOutingSessionSnapshot,
+} from '@/features/outing/persistence';
+import type { CompletedOuting } from '@/features/outing/types';
+import { persistentStorage } from '@/services/storage/asyncStorage';
+import { storageKeys } from '@/services/storage/types';
 
 type AddDrinkInput = {
   type: DrinkType;
@@ -25,6 +28,8 @@ type OutingSessionContextValue = {
   activeOuting: Outing | null;
   drinks: DrinkEntry[];
   lastFinishedOuting: CompletedOuting | null;
+  isHydrated: boolean;
+  persistenceError: boolean;
   startOuting: () => Outing;
   addDrink: (input: AddDrinkInput) => DrinkEntry | null;
   undoLastDrink: () => DrinkEntry | null;
@@ -42,6 +47,47 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
   const [activeOuting, setActiveOuting] = useState<Outing | null>(null);
   const [drinks, setDrinks] = useState<DrinkEntry[]>([]);
   const [lastFinishedOuting, setLastFinishedOuting] = useState<CompletedOuting | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [persistenceError, setPersistenceError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrate = async () => {
+      try {
+        const stored = await persistentStorage.get<unknown>(storageKeys.outingSession);
+        if (cancelled) return;
+
+        const restored = restoreOutingSessionSnapshot(stored);
+        setActiveOuting(restored.activeOuting);
+        setDrinks(restored.drinks);
+        setLastFinishedOuting(restored.lastFinishedOuting);
+      } catch {
+        if (!cancelled) setPersistenceError(true);
+      } finally {
+        if (!cancelled) setIsHydrated(true);
+      }
+    };
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    const snapshot = createOutingSessionSnapshot({
+      activeOuting,
+      drinks,
+      lastFinishedOuting,
+    });
+
+    void persistentStorage.set(storageKeys.outingSession, snapshot).catch(() => {
+      setPersistenceError(true);
+    });
+  }, [activeOuting, drinks, isHydrated, lastFinishedOuting]);
 
   const startOuting = useCallback(() => {
     if (activeOuting) return activeOuting;
@@ -62,7 +108,6 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
 
     setActiveOuting(outing);
     setDrinks([]);
-    setLastFinishedOuting(null);
     return outing;
   }, [activeOuting]);
 
@@ -116,7 +161,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       status: 'FINISHED',
       updatedAt: now,
     };
-    const snapshot = {
+    const snapshot: CompletedOuting = {
       outing: finished,
       drinks: [...drinks],
     };
@@ -134,6 +179,8 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       activeOuting,
       drinks,
       lastFinishedOuting,
+      isHydrated,
+      persistenceError,
       startOuting,
       addDrink,
       undoLastDrink,
@@ -144,6 +191,8 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       activeOuting,
       drinks,
       lastFinishedOuting,
+      isHydrated,
+      persistenceError,
       startOuting,
       addDrink,
       undoLastDrink,
