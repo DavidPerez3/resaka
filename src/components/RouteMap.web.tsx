@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { LocationPoint } from '@/services/location/types';
@@ -70,21 +70,17 @@ export function RouteMap({ points, height = 220 }: RouteMapProps) {
 
   return (
     <View style={[styles.frame, { height }]}>
-      {/** Web-only iframe keeps the Expo web preview independent from native map code. */}
-      {(() => {
-        const React = require('react') as typeof import('react');
-        return React.createElement('iframe', {
-          title: 'Ruta de la salida',
-          srcDoc,
-          sandbox: 'allow-scripts',
-          style: {
-            width: '100%',
-            height: '100%',
-            border: 0,
-            display: 'block',
-          },
-        });
-      })()}
+      {React.createElement('iframe', {
+        title: 'Ruta de la salida',
+        srcDoc,
+        sandbox: 'allow-scripts',
+        style: {
+          width: '100%',
+          height: '100%',
+          border: 0,
+          display: 'block',
+        },
+      })}
     </View>
   );
 }
