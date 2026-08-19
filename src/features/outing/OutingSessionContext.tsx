@@ -83,6 +83,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
         setDrinks(restored.drinks);
         setRoutePoints(restored.routePoints);
         setLastFinishedOuting(restored.lastFinishedOuting);
+        setShowCompletionSummary(restored.showCompletionSummary);
       } catch {
         if (!cancelled) setPersistenceError(true);
       } finally {
@@ -104,12 +105,13 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       drinks,
       routePoints,
       lastFinishedOuting,
+      showCompletionSummary,
     });
 
     void persistentStorage.set(storageKeys.outingSession, snapshot).catch(() => {
       setPersistenceError(true);
     });
-  }, [activeOuting, drinks, isHydrated, lastFinishedOuting, routePoints]);
+  }, [activeOuting, drinks, isHydrated, lastFinishedOuting, routePoints, showCompletionSummary]);
 
   useEffect(() => {
     if (!activeOuting) return;
