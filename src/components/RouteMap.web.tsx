@@ -1,11 +1,13 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { buildDrinkClusterBadge, type DrinkMapCluster } from '@/domain/drinkMap';
 import type { LocationPoint } from '@/services/location/types';
 import { colors } from '@/theme/colors';
 
 type RouteMapProps = {
   points: LocationPoint[];
+  drinkClusters?: DrinkMapCluster[];
   height?: number;
   endLabel?: string;
 };
@@ -14,9 +16,15 @@ function escapeJsonForHtml(value: unknown) {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
-function buildMapHtml(points: LocationPoint[], endLabel: string) {
+function buildMapHtml(points: LocationPoint[], drinkClusters: DrinkMapCluster[], endLabel: string) {
   const coordinates = points.map((point) => [point.latitude, point.longitude]);
+  const drinkMarkers = drinkClusters.map((cluster) => ({
+    latitude: cluster.latitude,
+    longitude: cluster.longitude,
+    badge: buildDrinkClusterBadge(cluster),
+  }));
   const safeCoordinates = escapeJsonForHtml(coordinates);
+  const safeDrinkMarkers = escapeJsonForHtml(drinkMarkers);
   const safeEndLabel = escapeJsonForHtml(endLabel);
 
   return `<!doctype html>
@@ -30,11 +38,12 @@ function buildMapHtml(points: LocationPoint[], endLabel: string) {
     .leaflet-container{background:#151922;font-family:system-ui,-apple-system,sans-serif}
     .leaflet-control-attribution{font-size:9px;background:rgba(21,25,34,.8)!important;color:#a7adba!important}
     .leaflet-control-attribution a{color:#e84a5f!important}
-    .legend{position:absolute;z-index:999;top:10px;left:10px;display:flex;gap:10px;padding:7px 10px;border-radius:13px;background:rgba(11,13,18,.86);color:#F7F2E8;font:800 10px system-ui,-apple-system,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.22)}
+    .legend{position:absolute;z-index:999;top:10px;left:10px;display:flex;flex-wrap:wrap;gap:10px;padding:7px 10px;border-radius:13px;background:rgba(11,13,18,.86);color:#F7F2E8;font:800 10px system-ui,-apple-system,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.22)}
     .legend-item{display:flex;align-items:center;gap:5px;white-space:nowrap}
     .dot{width:9px;height:9px;border-radius:50%}
     .start{background:#4CAF78}
     .end{background:#E84A5F}
+    .drink-marker{display:flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 6px;border-radius:16px;background:rgba(11,13,18,.94);border:2px solid #F7F2E8;color:#F7F2E8;font:900 14px system-ui,-apple-system,sans-serif;box-shadow:0 3px 10px rgba(0,0,0,.28);white-space:nowrap}
   </style>
 </head>
 <body>
@@ -43,10 +52,12 @@ function buildMapHtml(points: LocationPoint[], endLabel: string) {
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const points = ${safeCoordinates};
+    const drinks = ${safeDrinkMarkers};
     const endLabel = ${safeEndLabel};
     const legend = document.getElementById('legend');
     legend.innerHTML = '<div class="legend-item"><span class="dot start"></span><span>Inicio</span></div>' +
-      (points.length > 1 ? '<div class="legend-item"><span class="dot end"></span><span>' + endLabel + '</span></div>' : '');
+      (points.length > 1 ? '<div class="legend-item"><span class="dot end"></span><span>' + endLabel + '</span></div>' : '') +
+      (drinks.length > 0 ? '<div class="legend-item"><span>🍺</span><span>Consumición</span></div>' : '');
 
     const map = L.map('map', { zoomControl: false, attributionControl: true });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -63,13 +74,32 @@ function buildMapHtml(points: LocationPoint[], endLabel: string) {
       L.circleMarker(points[points.length-1], {radius:7,color:'#E84A5F',fillColor:'#E84A5F',fillOpacity:1,weight:3}).addTo(map);
       map.fitBounds(route.getBounds(), {padding:[30,30],maxZoom:17});
     }
+
+    drinks.forEach((drink) => {
+      const width = Math.max(34, 18 + Array.from(drink.badge).length * 8);
+      const icon = L.divIcon({
+        className: '',
+        html: '<div class="drink-marker">' + drink.badge + '</div>',
+        iconSize: [width, 34],
+        iconAnchor: [width / 2, 17]
+      });
+      L.marker([drink.latitude, drink.longitude], { icon, interactive: false }).addTo(map);
+    });
   </script>
 </body>
 </html>`;
 }
 
-export function RouteMap({ points, height = 220, endLabel = 'Última posición' }: RouteMapProps) {
-  const srcDoc = useMemo(() => buildMapHtml(points, endLabel), [endLabel, points]);
+export function RouteMap({
+  points,
+  drinkClusters = [],
+  height = 220,
+  endLabel = 'Última posición',
+}: RouteMapProps) {
+  const srcDoc = useMemo(
+    () => buildMapHtml(points, drinkClusters, endLabel),
+    [drinkClusters, endLabel, points],
+  );
 
   if (points.length === 0) {
     return (
