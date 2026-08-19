@@ -102,15 +102,19 @@ export function buildDrinkMapClusters(
   return clusters;
 }
 
-export function buildDrinkClusterBadge(cluster: DrinkMapCluster) {
+export function buildDrinkClusterTokens(cluster: DrinkMapCluster) {
   const counts = new Map<string, number>();
   for (const item of cluster.items) {
     counts.set(item.emoji, (counts.get(item.emoji) ?? 0) + 1);
   }
 
-  return Array.from(counts.entries())
-    .map(([emoji, count]) => (count > 1 ? `${emoji}${count}` : emoji))
-    .join(' ');
+  return Array.from(counts.entries()).map(([emoji, count]) =>
+    count > 1 ? `${emoji}${count}` : emoji,
+  );
+}
+
+export function buildDrinkClusterBadge(cluster: DrinkMapCluster) {
+  return buildDrinkClusterTokens(cluster).join(' ');
 }
 
 export function formatDrinkMapTime(timestamp: string) {
