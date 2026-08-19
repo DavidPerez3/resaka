@@ -1,13 +1,40 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Tabs, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
+import SummaryScreen from '@/app/summary';
 import { OutingSessionProvider, useOutingSession } from '@/features/outing/OutingSessionContext';
 import { colors } from '@/theme/colors';
 
+function StorageWarning({ visible }: { visible: boolean }) {
+  if (!visible) return null;
+
+  return (
+    <View style={styles.storageWarning}>
+      <Ionicons name="warning-outline" color={colors.warning} size={16} />
+      <Text style={styles.storageWarningText}>No se ha podido guardar localmente el último cambio.</Text>
+    </View>
+  );
+}
+
 function RootTabs() {
-  const { activeOuting, isHydrated, persistenceError } = useOutingSession();
+  const {
+    activeOuting,
+    lastFinishedOuting,
+    showCompletionSummary,
+    dismissCompletionSummary,
+    isHydrated,
+    persistenceError,
+  } = useOutingSession();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (showCompletionSummary && pathname === '/') {
+      dismissCompletionSummary();
+    }
+  }, [dismissCompletionSummary, pathname, showCompletionSummary]);
 
   if (!isHydrated) {
     return (
@@ -19,14 +46,20 @@ function RootTabs() {
     );
   }
 
+  // Al terminar una salida mostramos el resumen directamente sobre el shell de la app.
+  // Así GitHub Pages no depende de una transición SPA a una ruta oculta de Tabs.
+  if (showCompletionSummary && lastFinishedOuting && pathname !== '/') {
+    return (
+      <View style={styles.appShell}>
+        <StorageWarning visible={persistenceError} />
+        <SummaryScreen />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.appShell}>
-      {persistenceError ? (
-        <View style={styles.storageWarning}>
-          <Ionicons name="warning-outline" color={colors.warning} size={16} />
-          <Text style={styles.storageWarningText}>No se ha podido guardar localmente el último cambio.</Text>
-        </View>
-      ) : null}
+      <StorageWarning visible={persistenceError} />
 
       <Tabs
         screenOptions={{
