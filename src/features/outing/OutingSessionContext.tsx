@@ -11,6 +11,7 @@ import {
 import type { BeerSize, DrinkEntry, DrinkType } from '@/domain/drinks';
 import type { Outing } from '@/domain/outings';
 import { appendRoutePoint, calculateRouteDistance } from '@/domain/route';
+import type { OutingStop, Venue } from '@/domain/venues';
 import {
   createOutingSessionSnapshot,
   restoreOutingSessionSnapshot,
@@ -33,6 +34,9 @@ type OutingSessionContextValue = {
   activeOuting: Outing | null;
   drinks: DrinkEntry[];
   routePoints: LocationPoint[];
+  stops: OutingStop[];
+  knownVenues: Venue[];
+  currentVenue: Venue | null;
   lastFinishedOuting: CompletedOuting | null;
   showCompletionSummary: boolean;
   isHydrated: boolean;
@@ -42,6 +46,8 @@ type OutingSessionContextValue = {
   startOuting: () => Outing;
   addDrink: (input: AddDrinkInput) => DrinkEntry | null;
   undoLastDrink: () => DrinkEntry | null;
+  changeVenue: (venue: Venue) => OutingStop | null;
+  createManualVenue: (name: string) => Venue | null;
   finishOuting: () => CompletedOuting | null;
   clearLastFinishedOuting: () => void;
   dismissCompletionSummary: () => void;
@@ -54,10 +60,20 @@ function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function upsertVenue(list: Venue[], venue: Venue) {
+  const existing = list.findIndex((item) => item.id === venue.id);
+  if (existing < 0) return [...list, venue];
+  const next = [...list];
+  next[existing] = venue;
+  return next;
+}
+
 export function OutingSessionProvider({ children }: PropsWithChildren) {
   const [activeOuting, setActiveOuting] = useState<Outing | null>(null);
   const [drinks, setDrinks] = useState<DrinkEntry[]>([]);
   const [routePoints, setRoutePoints] = useState<LocationPoint[]>([]);
+  const [stops, setStops] = useState<OutingStop[]>([]);
+  const [knownVenues, setKnownVenues] = useState<Venue[]>([]);
   const [lastFinishedOuting, setLastFinishedOuting] = useState<CompletedOuting | null>(null);
   const [showCompletionSummary, setShowCompletionSummary] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -65,6 +81,11 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
   const [locationStatus, setLocationStatus] = useState<LocationTrackingStatus>('idle');
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationAttempt, setLocationAttempt] = useState(0);
+
+  const currentVenue = useMemo(() => {
+    if (!activeOuting?.currentVenueId) return null;
+    return knownVenues.find((venue) => venue.id === activeOuting.currentVenueId) ?? null;
+  }, [activeOuting?.currentVenueId, knownVenues]);
 
   const ingestRoutePoint = useCallback((point: LocationPoint) => {
     setRoutePoints((current) => appendRoutePoint(current, point));
@@ -82,6 +103,8 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
         setActiveOuting(restored.activeOuting);
         setDrinks(restored.drinks);
         setRoutePoints(restored.routePoints);
+        setStops(restored.stops);
+        setKnownVenues(restored.knownVenues);
         setLastFinishedOuting(restored.lastFinishedOuting);
         setShowCompletionSummary(restored.showCompletionSummary);
       } catch {
@@ -104,6 +127,8 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       activeOuting,
       drinks,
       routePoints,
+      stops,
+      knownVenues,
       lastFinishedOuting,
       showCompletionSummary,
     });
@@ -111,7 +136,16 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
     void persistentStorage.set(storageKeys.outingSession, snapshot).catch(() => {
       setPersistenceError(true);
     });
-  }, [activeOuting, drinks, isHydrated, lastFinishedOuting, routePoints, showCompletionSummary]);
+  }, [
+    activeOuting,
+    drinks,
+    isHydrated,
+    knownVenues,
+    lastFinishedOuting,
+    routePoints,
+    showCompletionSummary,
+    stops,
+  ]);
 
   useEffect(() => {
     if (!activeOuting) return;
@@ -198,6 +232,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
     setActiveOuting(outing);
     setDrinks([]);
     setRoutePoints([]);
+    setStops([]);
     return outing;
   }, [activeOuting]);
 
@@ -213,6 +248,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
         id: createId('drink'),
         userId: 'local-user',
         outingId: activeOuting.id,
+        venueId: activeOuting.currentVenueId,
         type,
         beerSize,
         subtype,
@@ -244,6 +280,62 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
     return last;
   }, [drinks]);
 
+  const changeVenue = useCallback(
+    (venue: Venue) => {
+      if (!activeOuting) return null;
+      if (activeOuting.currentVenueId === venue.id) {
+        return stops.findLast((stop) => stop.venueId === venue.id && !stop.departedAt) ?? null;
+      }
+
+      const now = new Date().toISOString();
+      const stop: OutingStop = {
+        id: createId('stop'),
+        outingId: activeOuting.id,
+        venueId: venue.id,
+        arrivedAt: now,
+        orderIndex: stops.length,
+      };
+
+      setKnownVenues((current) => upsertVenue(current, venue));
+      setStops((current) => [
+        ...current.map((item) =>
+          item.departedAt ? item : { ...item, departedAt: now },
+        ),
+        stop,
+      ]);
+      setActiveOuting((current) =>
+        current
+          ? {
+              ...current,
+              currentVenueId: venue.id,
+              updatedAt: now,
+            }
+          : current,
+      );
+      return stop;
+    },
+    [activeOuting, stops],
+  );
+
+  const createManualVenue = useCallback(
+    (name: string) => {
+      const trimmed = name.trim();
+      const latestPoint = routePoints[routePoints.length - 1];
+      if (!activeOuting || !trimmed || !latestPoint) return null;
+
+      return {
+        id: createId('venue'),
+        name: trimmed,
+        latitude: latestPoint.latitude,
+        longitude: latestPoint.longitude,
+        category: 'OTHER',
+        source: 'MANUAL',
+        createdAt: new Date().toISOString(),
+      } satisfies Venue;
+    },
+    [activeOuting, routePoints],
+  );
+
   const finishOuting = useCallback(() => {
     if (!activeOuting) return null;
 
@@ -256,10 +348,20 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       status: 'FINISHED',
       updatedAt: now,
     };
+    const finishedStops = stops.map((stop) =>
+      stop.departedAt ? stop : { ...stop, departedAt: now },
+    );
+    const venueIds = new Set([
+      ...finishedStops.map((stop) => stop.venueId),
+      ...drinks.map((drink) => drink.venueId).filter((id): id is string => Boolean(id)),
+    ]);
+    const venues = knownVenues.filter((venue) => venueIds.has(venue.id));
     const snapshot: CompletedOuting = {
       outing: finished,
       drinks: [...drinks],
       routePoints: [...routePoints],
+      stops: finishedStops,
+      venues,
     };
 
     setLastFinishedOuting(snapshot);
@@ -267,8 +369,9 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
     setActiveOuting(null);
     setDrinks([]);
     setRoutePoints([]);
+    setStops([]);
     return snapshot;
-  }, [activeOuting, drinks, routePoints]);
+  }, [activeOuting, drinks, knownVenues, routePoints, stops]);
 
   const clearLastFinishedOuting = useCallback(() => {
     setShowCompletionSummary(false);
@@ -282,6 +385,9 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       activeOuting,
       drinks,
       routePoints,
+      stops,
+      knownVenues,
+      currentVenue,
       lastFinishedOuting,
       showCompletionSummary,
       isHydrated,
@@ -291,6 +397,8 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       startOuting,
       addDrink,
       undoLastDrink,
+      changeVenue,
+      createManualVenue,
       finishOuting,
       clearLastFinishedOuting,
       dismissCompletionSummary,
@@ -300,6 +408,9 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       activeOuting,
       drinks,
       routePoints,
+      stops,
+      knownVenues,
+      currentVenue,
       lastFinishedOuting,
       showCompletionSummary,
       isHydrated,
@@ -309,6 +420,8 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       startOuting,
       addDrink,
       undoLastDrink,
+      changeVenue,
+      createManualVenue,
       finishOuting,
       clearLastFinishedOuting,
       dismissCompletionSummary,
