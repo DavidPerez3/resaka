@@ -1,14 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
+import type { ComponentProps } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '@/theme/colors';
 
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
 type Props = {
   eyebrow: string;
   title: string;
   description: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IoniconName;
 };
 
 export function SectionPlaceholder({ eyebrow, title, description, icon }: Props) {
