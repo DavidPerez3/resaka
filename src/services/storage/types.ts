@@ -5,6 +5,6 @@ export interface KeyValueStorage {
 }
 
 export const storageKeys = {
-  activeOuting: 'resaka.active-outing',
+  outingSession: 'resaka.outing-session.v1',
   pendingSync: 'resaka.pending-sync',
 } as const;
