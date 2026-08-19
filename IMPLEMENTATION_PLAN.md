@@ -21,7 +21,7 @@ src/
 - La lógica de negocio no vive en componentes React.
 - Solo existen cuatro categorías de bebida: cerveza, kalimotxo, chupito y copa.
 - Solo la cerveza tiene tamaño: quinto, tercio o litrona.
-- GPS y almacenamiento se consumen mediante interfaces para poder tener implementaciones específicas por plataforma.
+- GPS y almacenamiento se consumen mediante interfaces para poder cambiar implementaciones sin tocar el dominio.
 - Primero funcionalidad local; Supabase se integra cuando el flujo principal esté estable.
 - La preview web se publica desde `main` mediante GitHub Actions y Expo Web.
 
@@ -56,20 +56,27 @@ src/
 - [x] Resumen de duración y bebidas
 - [x] Desglose de quintos / tercios / litronas
 - [x] Timeline completo en el resumen
-- [x] Acceso al último resumen desde Home mientras la app siga abierta
+- [x] Acceso al último resumen desde Home
 
-> Estado: **COMPLETADO**. Los datos de este bloque viven todavía en memoria. Persistirlos tras cerrar o refrescar pertenece al Bloque 2.
+> Estado: **COMPLETADO**.
 
 ## Bloque 2 — Persistencia local
 
-- [ ] Abstracción de almacenamiento web/native
-- [ ] Guardar salida activa
-- [ ] Guardar bebidas y timestamps
-- [ ] Recuperar cronómetro real después de recargar
-- [ ] Recuperar timeline
-- [ ] Detectar una salida en curso al volver a abrir
-- [ ] Evitar dos salidas simultáneas
-- [ ] Mantener último resumen local
+- [x] Abstracción `KeyValueStorage`
+- [x] Adaptador persistente multiplataforma con AsyncStorage
+- [x] Snapshot versionado de la sesión
+- [x] Guardar salida activa automáticamente
+- [x] Guardar bebidas y timestamps automáticamente
+- [x] Recuperar cronómetro real después de recargar/cerrar
+- [x] Recuperar timeline y contadores
+- [x] Detectar una salida en curso al volver a abrir
+- [x] Evitar dos salidas simultáneas
+- [x] Mantener último resumen local
+- [x] Validar/sanear datos persistidos antes de restaurar
+- [x] Estado visual mientras se recuperan los datos
+- [x] Aviso si falla el almacenamiento local
+
+> Estado: **COMPLETADO**. El almacenamiento actual es local al dispositivo/navegador. La sincronización entre dispositivos llegará con Supabase en el Bloque 5.
 
 ## Bloque 3 — GPS y recorrido
 
