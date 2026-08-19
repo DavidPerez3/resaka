@@ -5,6 +5,7 @@ import type {
   CompletedOuting,
   OutingSessionSnapshotV1,
   OutingSessionSnapshotV2,
+  OutingSessionSnapshotV3,
 } from '@/features/outing/types';
 import type { LocationPoint } from '@/services/location/types';
 
@@ -102,54 +103,78 @@ export function createOutingSessionSnapshot(input: {
   drinks: DrinkEntry[];
   routePoints: LocationPoint[];
   lastFinishedOuting: CompletedOuting | null;
-}): OutingSessionSnapshotV2 {
+  showCompletionSummary: boolean;
+}): OutingSessionSnapshotV3 {
   return {
-    version: 2,
+    version: 3,
     activeOuting: input.activeOuting,
     drinks: input.activeOuting
       ? input.drinks.filter((drink) => drink.outingId === input.activeOuting?.id)
       : [],
     routePoints: input.activeOuting ? input.routePoints : [],
     lastFinishedOuting: input.lastFinishedOuting,
+    showCompletionSummary: input.showCompletionSummary && Boolean(input.lastFinishedOuting),
   };
 }
 
-function restoreV1(value: Record<string, unknown>): OutingSessionSnapshotV2 {
+function restoreV1(value: Record<string, unknown>): OutingSessionSnapshotV3 {
   const activeOuting = isOuting(value.activeOuting, 'ACTIVE') ? value.activeOuting : null;
   const legacyLastFinished = sanitizeCompletedOuting(value.lastFinishedOuting, true);
 
   return {
-    version: 2,
+    version: 3,
     activeOuting: activeOuting ? withRouteDistance(activeOuting, []) : null,
     drinks: activeOuting ? sanitizeDrinks(value.drinks, activeOuting.id) : [],
     routePoints: [],
     lastFinishedOuting: legacyLastFinished,
+    showCompletionSummary: false,
   };
 }
 
-export function restoreOutingSessionSnapshot(value: unknown): OutingSessionSnapshotV2 {
-  const empty: OutingSessionSnapshotV2 = {
-    version: 2,
-    activeOuting: null,
-    drinks: [],
-    routePoints: [],
-    lastFinishedOuting: null,
-  };
-
-  if (!isRecord(value)) return empty;
-  if (value.version === 1) return restoreV1(value as OutingSessionSnapshotV1 & Record<string, unknown>);
-  if (value.version !== 2) return empty;
-
+function restoreV2(value: Record<string, unknown>): OutingSessionSnapshotV3 {
   const routePoints = sanitizeRoutePoints(value.routePoints);
   const activeOuting = isOuting(value.activeOuting, 'ACTIVE')
     ? withRouteDistance(value.activeOuting, routePoints)
     : null;
 
   return {
-    version: 2,
+    version: 3,
     activeOuting,
     drinks: activeOuting ? sanitizeDrinks(value.drinks, activeOuting.id) : [],
     routePoints: activeOuting ? routePoints : [],
     lastFinishedOuting: sanitizeCompletedOuting(value.lastFinishedOuting),
+    showCompletionSummary: false,
+  };
+}
+
+export function restoreOutingSessionSnapshot(value: unknown): OutingSessionSnapshotV3 {
+  const empty: OutingSessionSnapshotV3 = {
+    version: 3,
+    activeOuting: null,
+    drinks: [],
+    routePoints: [],
+    lastFinishedOuting: null,
+    showCompletionSummary: false,
+  };
+
+  if (!isRecord(value)) return empty;
+  if (value.version === 1) return restoreV1(value as OutingSessionSnapshotV1 & Record<string, unknown>);
+  if (value.version === 2) return restoreV2(value as OutingSessionSnapshotV2 & Record<string, unknown>);
+  if (value.version !== 3) return empty;
+
+  const routePoints = sanitizeRoutePoints(value.routePoints);
+  const activeOuting = isOuting(value.activeOuting, 'ACTIVE')
+    ? withRouteDistance(value.activeOuting, routePoints)
+    : null;
+  const lastFinishedOuting = sanitizeCompletedOuting(value.lastFinishedOuting);
+
+  return {
+    version: 3,
+    activeOuting,
+    drinks: activeOuting ? sanitizeDrinks(value.drinks, activeOuting.id) : [],
+    routePoints: activeOuting ? routePoints : [],
+    lastFinishedOuting,
+    showCompletionSummary:
+      value.showCompletionSummary === true && Boolean(lastFinishedOuting),
   };
 }
