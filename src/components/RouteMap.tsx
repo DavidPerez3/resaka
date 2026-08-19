@@ -26,13 +26,37 @@ export function RouteMap({
   endLabel = 'Última posición',
 }: RouteMapProps) {
   const mapRef = useRef<MapView | null>(null);
-  const { activeOuting, drinks, lastFinishedOuting } = useOutingSession();
+  const { activeOuting, drinks, stops, knownVenues, lastFinishedOuting } = useOutingSession();
+
+  const sourceVenues = activeOuting ? knownVenues : (lastFinishedOuting?.venues ?? knownVenues);
+  const sourceStops = activeOuting ? stops : (lastFinishedOuting?.stops ?? []);
 
   const resolvedDrinkClusters = useMemo(() => {
     if (drinkClusters) return drinkClusters;
     const sourceDrinks = activeOuting ? drinks : (lastFinishedOuting?.drinks ?? []);
-    return buildDrinkMapClusters(sourceDrinks);
-  }, [activeOuting, drinkClusters, drinks, lastFinishedOuting]);
+    const venueById = new Map(sourceVenues.map((venue) => [venue.id, venue.name]));
+    return buildDrinkMapClusters(
+      sourceDrinks,
+      (drink) => (drink.venueId ? venueById.get(drink.venueId) ?? 'Sin garito' : 'Sin garito'),
+    );
+  }, [activeOuting, drinkClusters, drinks, lastFinishedOuting, sourceVenues]);
+
+  const venueMarkers = useMemo(() => {
+    const venueById = new Map(sourceVenues.map((venue) => [venue.id, venue]));
+    const unique = new Map<string, { id: string; name: string; latitude: number; longitude: number }>();
+    for (const stop of sourceStops) {
+      const venue = venueById.get(stop.venueId);
+      if (venue) {
+        unique.set(venue.id, {
+          id: venue.id,
+          name: venue.name,
+          latitude: venue.latitude,
+          longitude: venue.longitude,
+        });
+      }
+    }
+    return Array.from(unique.values());
+  }, [sourceStops, sourceVenues]);
 
   const coordinates = useMemo(
     () => points.map((point) => ({ latitude: point.latitude, longitude: point.longitude })),
@@ -100,6 +124,19 @@ export function RouteMap({
             <Polyline coordinates={coordinates} strokeColor={colors.accent} strokeWidth={5} />
           ) : null}
 
+          {venueMarkers.map((venue) => (
+            <Marker
+              key={`venue-${venue.id}`}
+              coordinate={{ latitude: venue.latitude, longitude: venue.longitude }}
+              title={venue.name}
+              tracksViewChanges={false}
+            >
+              <View style={styles.venueMarker}>
+                <Text style={styles.venueMarkerText}>📍</Text>
+              </View>
+            </Marker>
+          ))}
+
           {resolvedDrinkClusters.map((cluster) => {
             const tokens = buildDrinkClusterTokens(cluster);
             return (
@@ -134,6 +171,12 @@ export function RouteMap({
               <Text style={styles.legendText}>{endLabel}</Text>
             </View>
           ) : null}
+          {venueMarkers.length > 0 ? (
+            <View style={styles.legendItem}>
+              <Text style={styles.legendDrink}>📍</Text>
+              <Text style={styles.legendText}>Garito</Text>
+            </View>
+          ) : null}
           {resolvedDrinkClusters.length > 0 ? (
             <View style={styles.legendItem}>
               <Text style={styles.legendDrink}>🍺</Text>
@@ -155,6 +198,17 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: colors.surface,
   },
+  venueMarker: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 15,
+    backgroundColor: 'rgba(11,13,18,0.94)',
+    borderWidth: 2,
+    borderColor: colors.accent,
+  },
+  venueMarkerText: { fontSize: 15 },
   drinkMarker: {
     minHeight: 38,
     paddingHorizontal: 10,
