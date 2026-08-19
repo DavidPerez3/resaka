@@ -2,16 +2,23 @@ import { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
+import { buildDrinkClusterBadge, type DrinkMapCluster } from '@/domain/drinkMap';
 import type { LocationPoint } from '@/services/location/types';
 import { colors } from '@/theme/colors';
 
 type RouteMapProps = {
   points: LocationPoint[];
+  drinkClusters?: DrinkMapCluster[];
   height?: number;
   endLabel?: string;
 };
 
-export function RouteMap({ points, height = 220, endLabel = 'Última posición' }: RouteMapProps) {
+export function RouteMap({
+  points,
+  drinkClusters = [],
+  height = 220,
+  endLabel = 'Última posición',
+}: RouteMapProps) {
   const mapRef = useRef<MapView | null>(null);
 
   const coordinates = useMemo(
@@ -77,6 +84,19 @@ export function RouteMap({ points, height = 220, endLabel = 'Última posición' 
         {coordinates.length > 1 ? (
           <Polyline coordinates={coordinates} strokeColor={colors.accent} strokeWidth={5} />
         ) : null}
+
+        {drinkClusters.map((cluster) => (
+          <Marker
+            key={cluster.id}
+            coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
+            tracksViewChanges={false}
+          >
+            <View style={styles.drinkMarker}>
+              <Text style={styles.drinkMarkerText}>{buildDrinkClusterBadge(cluster)}</Text>
+            </View>
+          </Marker>
+        ))}
+
         <Marker coordinate={first} title="Inicio" pinColor={colors.success} />
         {coordinates.length > 1 ? (
           <Marker coordinate={last} title={endLabel} pinColor={colors.accent} />
@@ -94,6 +114,12 @@ export function RouteMap({ points, height = 220, endLabel = 'Última posición' 
             <Text style={styles.legendText}>{endLabel}</Text>
           </View>
         ) : null}
+        {drinkClusters.length > 0 ? (
+          <View style={styles.legendItem}>
+            <Text style={styles.legendDrink}>🍺</Text>
+            <Text style={styles.legendText}>Consumición</Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -105,11 +131,28 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: colors.surface,
   },
+  drinkMarker: {
+    minWidth: 34,
+    minHeight: 34,
+    paddingHorizontal: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    backgroundColor: 'rgba(11,13,18,0.94)',
+    borderWidth: 2,
+    borderColor: colors.text,
+  },
+  drinkMarkerText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
   legend: {
     position: 'absolute',
     top: 10,
     left: 10,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -128,6 +171,7 @@ const styles = StyleSheet.create({
   },
   startDot: { backgroundColor: colors.success },
   endDot: { backgroundColor: colors.accent },
+  legendDrink: { fontSize: 11 },
   legendText: {
     color: colors.text,
     fontSize: 10,
