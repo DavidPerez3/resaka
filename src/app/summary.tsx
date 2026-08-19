@@ -97,9 +97,9 @@ export default function SummaryScreen() {
           <View style={styles.mapIcon}>
             <Ionicons name="map-outline" color={colors.accent} size={30} />
           </View>
-          <Text style={styles.mapTitle}>La ruta llegará en el Bloque 3.</Text>
+          <Text style={styles.mapTitle}>La ruta llega en el Bloque 3.</Text>
           <Text style={styles.mapText}>
-            El resumen ya está preparado para enseñar mapa, distancia y recorrido cuando conectemos el GPS.
+            Ya tenemos la salida a salvo. Lo siguiente será registrar GPS, distancia y recorrido real.
           </Text>
         </View>
 
@@ -150,12 +150,12 @@ export default function SummaryScreen() {
           </View>
         </View>
 
-        <View style={styles.blockComplete}>
-          <Ionicons name="checkmark-circle" color={colors.accent} size={26} />
-          <View style={styles.blockCopy}>
-            <Text style={styles.blockTitle}>Bloque 1 completado</Text>
-            <Text style={styles.blockText}>
-              Este resumen vive solo en memoria por ahora. En el Bloque 2 haremos que sobreviva a cierres y recargas.
+        <View style={styles.savedCard}>
+          <Ionicons name="shield-checkmark" color={colors.success} size={27} />
+          <View style={styles.savedCopy}>
+            <Text style={styles.savedTitle}>Guardado en este dispositivo</Text>
+            <Text style={styles.savedText}>
+              Puedes cerrar o recargar RESAKA: este resumen seguirá aquí. La sincronización entre dispositivos llegará con tu cuenta.
             </Text>
           </View>
         </View>
@@ -217,7 +217,7 @@ function BeerRow({ label, value }: { label: string; value: number }) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
-  container: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 36, gap: 22 },
+  container: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 42, gap: 22 },
   header: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
   closeButton: {
     width: 42,
@@ -313,16 +313,18 @@ const styles = StyleSheet.create({
   timelineCopy: { flex: 1, paddingTop: 1 },
   timelineTitle: { color: colors.text, fontSize: 13, fontWeight: '800' },
   timelineDetail: { marginTop: 2, color: colors.textMuted, fontSize: 11 },
-  blockComplete: {
+  savedCard: {
     flexDirection: 'row',
     gap: 12,
     padding: 17,
     borderRadius: 20,
     backgroundColor: colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  blockCopy: { flex: 1 },
-  blockTitle: { color: colors.text, fontSize: 14, fontWeight: '900' },
-  blockText: { marginTop: 3, color: colors.textMuted, fontSize: 12, lineHeight: 18 },
+  savedCopy: { flex: 1 },
+  savedTitle: { color: colors.text, fontSize: 14, fontWeight: '900' },
+  savedText: { marginTop: 3, color: colors.textMuted, fontSize: 12, lineHeight: 18 },
   primaryButton: {
     minHeight: 56,
     alignItems: 'center',
