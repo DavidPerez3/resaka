@@ -25,3 +25,12 @@ export type OutingSessionSnapshotV2 = {
   routePoints: LocationPoint[];
   lastFinishedOuting: CompletedOuting | null;
 };
+
+export type OutingSessionSnapshotV3 = {
+  version: 3;
+  activeOuting: Outing | null;
+  drinks: DrinkEntry[];
+  routePoints: LocationPoint[];
+  lastFinishedOuting: CompletedOuting | null;
+  showCompletionSummary: boolean;
+};
