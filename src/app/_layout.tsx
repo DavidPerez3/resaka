@@ -1,67 +1,86 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { OutingSessionProvider, useOutingSession } from '@/features/outing/OutingSessionContext';
 import { colors } from '@/theme/colors';
 
 function RootTabs() {
-  const { activeOuting } = useOutingSession();
+  const { activeOuting, isHydrated, persistenceError } = useOutingSession();
+
+  if (!isHydrated) {
+    return (
+      <View style={styles.loadingScreen}>
+        <ActivityIndicator color={colors.accent} size="large" />
+        <Text style={styles.loadingTitle}>RECUPERANDO LA NOCHE</Text>
+        <Text style={styles.loadingText}>Un segundo, estamos buscando las pruebas.</Text>
+      </View>
+    );
+  }
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.text,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: styles.tabBarLabel,
-        tabBarHideOnKeyboard: true,
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Inicio',
-          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
+    <View style={styles.appShell}>
+      {persistenceError ? (
+        <View style={styles.storageWarning}>
+          <Ionicons name="warning-outline" color={colors.warning} size={16} />
+          <Text style={styles.storageWarningText}>No se ha podido guardar localmente el último cambio.</Text>
+        </View>
+      ) : null}
+
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: colors.text,
+          tabBarInactiveTintColor: colors.textMuted,
+          tabBarStyle: styles.tabBar,
+          tabBarLabelStyle: styles.tabBarLabel,
+          tabBarHideOnKeyboard: true,
         }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explorar',
-          tabBarIcon: ({ color, size }) => <Ionicons name="compass-outline" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="outing"
-        options={{
-          title: activeOuting ? 'En curso' : 'Salida',
-          tabBarLabelStyle: styles.recordLabel,
-          tabBarIcon: ({ focused }) => (
-            <View style={[styles.recordButton, focused && styles.recordButtonFocused]}>
-              <Ionicons name={activeOuting ? 'radio' : 'add'} color={colors.text} size={activeOuting ? 24 : 31} />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="clubs"
-        options={{
-          title: 'Cuadrillas',
-          tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Perfil',
-          tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen name="summary" options={{ href: null }} />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Inicio',
+            tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="explore"
+          options={{
+            title: 'Explorar',
+            tabBarIcon: ({ color, size }) => <Ionicons name="compass-outline" color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="outing"
+          options={{
+            title: activeOuting ? 'En curso' : 'Salida',
+            tabBarLabelStyle: styles.recordLabel,
+            tabBarIcon: ({ focused }) => (
+              <View style={[styles.recordButton, focused && styles.recordButtonFocused]}>
+                <Ionicons name={activeOuting ? 'radio' : 'add'} color={colors.text} size={activeOuting ? 24 : 31} />
+              </View>
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="clubs"
+          options={{
+            title: 'Cuadrillas',
+            tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Perfil',
+            tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen name="summary" options={{ href: null }} />
+      </Tabs>
+    </View>
   );
 }
 
@@ -75,6 +94,46 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+  appShell: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  loadingScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingHorizontal: 28,
+    backgroundColor: colors.background,
+  },
+  loadingTitle: {
+    marginTop: 8,
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  loadingText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  storageWarning: {
+    minHeight: 34,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: colors.surfaceRaised,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  storageWarningText: {
+    color: colors.warning,
+    fontSize: 11,
+    fontWeight: '700',
+  },
   tabBar: {
     height: 78,
     paddingTop: 8,
