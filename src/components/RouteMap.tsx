@@ -11,7 +11,7 @@ type RouteMapProps = {
   endLabel?: string;
 };
 
-export function RouteMap({ points, height = 220, endLabel = 'Ahora' }: RouteMapProps) {
+export function RouteMap({ points, height = 220, endLabel = 'Última posición' }: RouteMapProps) {
   const mapRef = useRef<MapView | null>(null);
 
   const coordinates = useMemo(
