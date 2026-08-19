@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { router, Tabs, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { OutingSessionProvider, useOutingSession } from '@/features/outing/OutingSessionContext';
@@ -18,7 +19,35 @@ function StorageWarning({ visible }: { visible: boolean }) {
 }
 
 function RootTabs() {
-  const { activeOuting, isHydrated, persistenceError } = useOutingSession();
+  const {
+    activeOuting,
+    lastFinishedOuting,
+    showCompletionSummary,
+    dismissCompletionSummary,
+    isHydrated,
+    persistenceError,
+  } = useOutingSession();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!isHydrated || !showCompletionSummary) return;
+
+    if (!activeOuting && lastFinishedOuting && pathname === '/outing') {
+      router.replace('/summary');
+      return;
+    }
+
+    if (pathname === '/') {
+      dismissCompletionSummary();
+    }
+  }, [
+    activeOuting,
+    dismissCompletionSummary,
+    isHydrated,
+    lastFinishedOuting,
+    pathname,
+    showCompletionSummary,
+  ]);
 
   if (!isHydrated) {
     return (
