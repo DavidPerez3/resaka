@@ -1,8 +1,11 @@
 import type { DrinkEntry } from '@/domain/drinks';
 import type { Outing } from '@/domain/outings';
+import type { OutingStop, Venue } from '@/domain/venues';
 
 export type TimelineEventType =
   | 'OUTING_START'
+  | 'VENUE_ENTER'
+  | 'VENUE_EXIT'
   | 'BEER'
   | 'KALIMOTXO'
   | 'SHOT'
@@ -24,13 +27,16 @@ const beerSizeLabel = {
   LITRONA: 'Litrona',
 } as const;
 
-function drinkToTimelineEvent(drink: DrinkEntry): TimelineEvent {
+function drinkToTimelineEvent(drink: DrinkEntry, venueById: Map<string, Venue>): TimelineEvent {
+  const venueName = drink.venueId ? venueById.get(drink.venueId)?.name : undefined;
+
   if (drink.type === 'BEER') {
     return {
       id: `drink-${drink.id}`,
       type: 'BEER',
       timestamp: drink.timestamp,
       title: drink.beerSize ? beerSizeLabel[drink.beerSize] : 'Cerveza',
+      detail: venueName,
       emoji: '🍺',
     };
   }
@@ -47,12 +53,45 @@ function drinkToTimelineEvent(drink: DrinkEntry): TimelineEvent {
     type: item.type,
     timestamp: drink.timestamp,
     title: item.title,
-    detail: drink.subtype,
+    detail: [drink.subtype, venueName].filter(Boolean).join(' · ') || undefined,
     emoji: item.emoji,
   };
 }
 
-export function buildOutingTimeline(outing: Outing, drinks: DrinkEntry[]): TimelineEvent[] {
+function stopToTimelineEvents(stop: OutingStop, venueById: Map<string, Venue>): TimelineEvent[] {
+  const venue = venueById.get(stop.venueId);
+  const name = venue?.name ?? 'Garito';
+  const events: TimelineEvent[] = [
+    {
+      id: `stop-enter-${stop.id}`,
+      type: 'VENUE_ENTER',
+      timestamp: stop.arrivedAt,
+      title: `Llegada a ${name}`,
+      detail: venue?.address,
+      emoji: '📍',
+    },
+  ];
+
+  if (stop.departedAt) {
+    events.push({
+      id: `stop-exit-${stop.id}`,
+      type: 'VENUE_EXIT',
+      timestamp: stop.departedAt,
+      title: `Salida de ${name}`,
+      emoji: '↗️',
+    });
+  }
+
+  return events;
+}
+
+export function buildOutingTimeline(
+  outing: Outing,
+  drinks: DrinkEntry[],
+  stops: OutingStop[] = [],
+  venues: Venue[] = [],
+): TimelineEvent[] {
+  const venueById = new Map(venues.map((venue) => [venue.id, venue]));
   const events: TimelineEvent[] = [
     {
       id: `outing-start-${outing.id}`,
@@ -61,7 +100,8 @@ export function buildOutingTimeline(outing: Outing, drinks: DrinkEntry[]): Timel
       title: 'Empieza la salida',
       emoji: '▶️',
     },
-    ...drinks.map(drinkToTimelineEvent),
+    ...stops.flatMap((stop) => stopToTimelineEvents(stop, venueById)),
+    ...drinks.map((drink) => drinkToTimelineEvent(drink, venueById)),
   ];
 
   if (outing.endedAt) {
