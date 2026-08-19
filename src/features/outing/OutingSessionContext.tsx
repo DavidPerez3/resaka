@@ -10,11 +10,14 @@ import {
 
 import type { BeerSize, DrinkEntry, DrinkType } from '@/domain/drinks';
 import type { Outing } from '@/domain/outings';
+import { appendRoutePoint, calculateRouteDistance } from '@/domain/route';
 import {
   createOutingSessionSnapshot,
   restoreOutingSessionSnapshot,
 } from '@/features/outing/persistence';
 import type { CompletedOuting } from '@/features/outing/types';
+import { locationTracker } from '@/services/location/expoLocationTracker';
+import type { LocationPoint } from '@/services/location/types';
 import { persistentStorage } from '@/services/storage/asyncStorage';
 import { storageKeys } from '@/services/storage/types';
 
@@ -24,17 +27,23 @@ type AddDrinkInput = {
   subtype?: string;
 };
 
+export type LocationTrackingStatus = 'idle' | 'requesting' | 'tracking' | 'denied' | 'error';
+
 type OutingSessionContextValue = {
   activeOuting: Outing | null;
   drinks: DrinkEntry[];
+  routePoints: LocationPoint[];
   lastFinishedOuting: CompletedOuting | null;
   isHydrated: boolean;
   persistenceError: boolean;
+  locationStatus: LocationTrackingStatus;
+  locationError: string | null;
   startOuting: () => Outing;
   addDrink: (input: AddDrinkInput) => DrinkEntry | null;
   undoLastDrink: () => DrinkEntry | null;
   finishOuting: () => CompletedOuting | null;
   clearLastFinishedOuting: () => void;
+  retryLocationTracking: () => void;
 };
 
 const OutingSessionContext = createContext<OutingSessionContextValue | null>(null);
@@ -46,9 +55,17 @@ function createId(prefix: string) {
 export function OutingSessionProvider({ children }: PropsWithChildren) {
   const [activeOuting, setActiveOuting] = useState<Outing | null>(null);
   const [drinks, setDrinks] = useState<DrinkEntry[]>([]);
+  const [routePoints, setRoutePoints] = useState<LocationPoint[]>([]);
   const [lastFinishedOuting, setLastFinishedOuting] = useState<CompletedOuting | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [persistenceError, setPersistenceError] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<LocationTrackingStatus>('idle');
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationAttempt, setLocationAttempt] = useState(0);
+
+  const ingestRoutePoint = useCallback((point: LocationPoint) => {
+    setRoutePoints((current) => appendRoutePoint(current, point));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +78,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
         const restored = restoreOutingSessionSnapshot(stored);
         setActiveOuting(restored.activeOuting);
         setDrinks(restored.drinks);
+        setRoutePoints(restored.routePoints);
         setLastFinishedOuting(restored.lastFinishedOuting);
       } catch {
         if (!cancelled) setPersistenceError(true);
@@ -81,13 +99,78 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
     const snapshot = createOutingSessionSnapshot({
       activeOuting,
       drinks,
+      routePoints,
       lastFinishedOuting,
     });
 
     void persistentStorage.set(storageKeys.outingSession, snapshot).catch(() => {
       setPersistenceError(true);
     });
-  }, [activeOuting, drinks, isHydrated, lastFinishedOuting]);
+  }, [activeOuting, drinks, isHydrated, lastFinishedOuting, routePoints]);
+
+  useEffect(() => {
+    if (!activeOuting) return;
+
+    const distanceMeters = calculateRouteDistance(routePoints);
+    setActiveOuting((current) => {
+      if (!current || Math.abs(current.distanceMeters - distanceMeters) < 0.5) return current;
+
+      return {
+        ...current,
+        distanceMeters,
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  }, [routePoints, activeOuting?.id]);
+
+  useEffect(() => {
+    if (!isHydrated || !activeOuting) {
+      setLocationStatus('idle');
+      setLocationError(null);
+      return;
+    }
+
+    let cancelled = false;
+    let subscription: { remove: () => void | Promise<void> } | null = null;
+
+    const beginTracking = async () => {
+      setLocationStatus('requesting');
+      setLocationError(null);
+
+      try {
+        const granted = await locationTracker.requestPermission();
+        if (cancelled) return;
+
+        if (!granted) {
+          setLocationStatus('denied');
+          return;
+        }
+
+        const current = await locationTracker.getCurrentPosition();
+        if (cancelled) return;
+        if (current) ingestRoutePoint(current);
+
+        subscription = await locationTracker.start(ingestRoutePoint);
+        if (cancelled) {
+          await subscription.remove();
+          return;
+        }
+
+        setLocationStatus('tracking');
+      } catch (error) {
+        if (cancelled) return;
+        setLocationStatus('error');
+        setLocationError(error instanceof Error ? error.message : 'No se pudo iniciar el GPS.');
+      }
+    };
+
+    void beginTracking();
+
+    return () => {
+      cancelled = true;
+      if (subscription) void subscription.remove();
+    };
+  }, [activeOuting?.id, ingestRoutePoint, isHydrated, locationAttempt]);
 
   const startOuting = useCallback(() => {
     if (activeOuting) return activeOuting;
@@ -108,6 +191,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
 
     setActiveOuting(outing);
     setDrinks([]);
+    setRoutePoints([]);
     return outing;
   }, [activeOuting]);
 
@@ -118,6 +202,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       if (type !== 'BEER' && beerSize) return null;
 
       const now = new Date().toISOString();
+      const latestPoint = routePoints[routePoints.length - 1];
       const drink: DrinkEntry = {
         id: createId('drink'),
         userId: 'local-user',
@@ -126,6 +211,8 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
         beerSize,
         subtype,
         timestamp: now,
+        latitude: latestPoint?.latitude,
+        longitude: latestPoint?.longitude,
         createdAt: now,
         updatedAt: now,
       };
@@ -141,7 +228,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       );
       return drink;
     },
-    [activeOuting],
+    [activeOuting, routePoints],
   );
 
   const undoLastDrink = useCallback(() => {
@@ -155,8 +242,10 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
     if (!activeOuting) return null;
 
     const now = new Date().toISOString();
+    const distanceMeters = calculateRouteDistance(routePoints);
     const finished: Outing = {
       ...activeOuting,
+      distanceMeters,
       endedAt: now,
       status: 'FINISHED',
       updatedAt: now,
@@ -164,40 +253,51 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
     const snapshot: CompletedOuting = {
       outing: finished,
       drinks: [...drinks],
+      routePoints: [...routePoints],
     };
 
     setLastFinishedOuting(snapshot);
     setActiveOuting(null);
     setDrinks([]);
+    setRoutePoints([]);
     return snapshot;
-  }, [activeOuting, drinks]);
+  }, [activeOuting, drinks, routePoints]);
 
   const clearLastFinishedOuting = useCallback(() => setLastFinishedOuting(null), []);
+  const retryLocationTracking = useCallback(() => setLocationAttempt((value) => value + 1), []);
 
   const value = useMemo(
     () => ({
       activeOuting,
       drinks,
+      routePoints,
       lastFinishedOuting,
       isHydrated,
       persistenceError,
+      locationStatus,
+      locationError,
       startOuting,
       addDrink,
       undoLastDrink,
       finishOuting,
       clearLastFinishedOuting,
+      retryLocationTracking,
     }),
     [
       activeOuting,
       drinks,
+      routePoints,
       lastFinishedOuting,
       isHydrated,
       persistenceError,
+      locationStatus,
+      locationError,
       startOuting,
       addDrink,
       undoLastDrink,
       finishOuting,
       clearLastFinishedOuting,
+      retryLocationTracking,
     ],
   );
 
