@@ -19,7 +19,22 @@ function formatElapsed(totalSeconds: number) {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  return [hours, minutes, seconds].map((value) => String(value).padStart(2, '0')).join(':');
+
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, '0'))
+    .join(':');
+}
+
+function getDrinkLabel(type: DrinkType, beerSize?: BeerSize) {
+  if (type === 'BEER') {
+    if (beerSize === 'QUINTO') return 'Quinto';
+    if (beerSize === 'TERCIO') return 'Tercio';
+    return 'Litrona';
+  }
+
+  if (type === 'KALIMOTXO') return 'Kalimotxo';
+  if (type === 'SHOT') return 'Chupito';
+  return 'Copa';
 }
 
 export default function OutingScreen() {
@@ -31,6 +46,7 @@ export default function OutingScreen() {
     undoLastDrink,
     finishOuting,
   } = useOutingSession();
+
   const [elapsed, setElapsed] = useState(0);
   const [beerPickerOpen, setBeerPickerOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
@@ -43,7 +59,8 @@ export default function OutingScreen() {
     }
 
     const tick = () => {
-      setElapsed(Math.max(0, Math.floor((Date.now() - new Date(activeOuting.startedAt).getTime()) / 1000)));
+      const startedAt = new Date(activeOuting.startedAt).getTime();
+      setElapsed(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
     };
 
     tick();
@@ -78,30 +95,22 @@ export default function OutingScreen() {
 
   const handleUndo = () => {
     const removed = undoLastDrink();
+
     if (!removed) {
       setNotice('Todavía no hay nada que deshacer.');
       return;
     }
 
-    const label =
-      removed.type === 'BEER'
-        ? removed.beerSize === 'QUINTO'
-          ? 'Quinto'
-          : removed.beerSize === 'TERCIO'
-            ? 'Tercio'
-            : 'Litrona'
-        : removed.type === 'KALIMOTXO'
-          ? 'Kalimotxo'
-          : removed.type === 'SHOT'
-            ? 'Chupito'
-            : 'Copa';
-    setNotice(`${label} eliminado.`);
+    setNotice(`${getDrinkLabel(removed.type, removed.beerSize)} eliminado.`);
   };
 
   const handleFinish = () => {
     const finished = finishOuting();
     setFinishOpen(false);
-    if (finished) router.replace('/summary');
+
+    if (finished) {
+      router.replace('/summary');
+    }
   };
 
   if (!activeOuting) {
@@ -138,6 +147,8 @@ export default function OutingScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
       >
         <View style={styles.topRow}>
           <View>
@@ -147,6 +158,7 @@ export default function OutingScreen() {
             </View>
             <Text style={styles.timer}>{formatElapsed(elapsed)}</Text>
           </View>
+
           <View style={styles.venueBadge}>
             <Ionicons name="location-outline" color={colors.textMuted} size={16} />
             <Text style={styles.venueText}>Sin garito</Text>
@@ -221,22 +233,21 @@ export default function OutingScreen() {
                   <Text style={styles.timelineTime}>{formatTimelineTime(event.timestamp)}</Text>
                   <View style={styles.timelineRail}>
                     <View style={styles.timelineDot} />
-                    {index < Math.min(timeline.length, 6) - 1 ? <View style={styles.timelineLine} /> : null}
+                    {index < Math.min(timeline.length, 6) - 1 ? (
+                      <View style={styles.timelineLine} />
+                    ) : null}
                   </View>
                   <Text style={styles.timelineEmoji}>{event.emoji}</Text>
                   <View style={styles.timelineCopy}>
                     <Text style={styles.timelineTitle}>{event.title}</Text>
-                    {event.detail ? <Text style={styles.timelineDetail}>{event.detail}</Text> : null}
+                    {event.detail ? (
+                      <Text style={styles.timelineDetail}>{event.detail}</Text>
+                    ) : null}
                   </View>
                 </View>
               ))}
           </View>
         </View>
-
-        <Pressable style={styles.venueButton} disabled accessibilityRole="button">
-          <Ionicons name="location" color={colors.textMuted} size={18} />
-          <Text style={styles.venueButtonText}>CAMBIAR DE GARITO · BLOQUE 4</Text>
-        </Pressable>
 
         <Pressable
           style={({ pressed }) => [styles.finishButton, pressed && styles.finishButtonPressed]}
@@ -254,16 +265,20 @@ export default function OutingScreen() {
         onRequestClose={() => setBeerPickerOpen(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setBeerPickerOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => undefined}>
+          <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetEyebrow}>🍺 CERVEZA</Text>
             <Text style={styles.sheetTitle}>¿Qué ha caído?</Text>
             <Text style={styles.sheetText}>Solo necesitamos el formato. Nada de cálculos inventados.</Text>
+
             <View style={styles.beerOptions}>
               {BEER_OPTIONS.map((option) => (
                 <Pressable
                   key={option.size}
-                  style={({ pressed }) => [styles.beerOption, pressed && styles.beerOptionPressed]}
+                  style={({ pressed }) => [
+                    styles.beerOption,
+                    pressed && styles.beerOptionPressed,
+                  ]}
                   onPress={() => addBeer(option.size, option.label)}
                 >
                   <View>
@@ -278,7 +293,12 @@ export default function OutingScreen() {
         </Pressable>
       </Modal>
 
-      <Modal transparent visible={finishOpen} animationType="fade" onRequestClose={() => setFinishOpen(false)}>
+      <Modal
+        transparent
+        visible={finishOpen}
+        animationType="fade"
+        onRequestClose={() => setFinishOpen(false)}
+      >
         <View style={styles.finishBackdrop}>
           <View style={styles.finishCard}>
             <Text style={styles.finishEyebrow}>FIN DE LA NOCHE</Text>
@@ -287,9 +307,15 @@ export default function OutingScreen() {
               {formatElapsed(elapsed)} · {drinks.length} bebida{drinks.length === 1 ? '' : 's'} registrada
               {drinks.length === 1 ? '' : 's'}
             </Text>
-            <Pressable style={styles.confirmFinish} onPress={handleFinish} accessibilityRole="button">
+
+            <Pressable
+              style={styles.confirmFinish}
+              onPress={handleFinish}
+              accessibilityRole="button"
+            >
               <Text style={styles.confirmFinishText}>TERMINAR Y VER RESUMEN</Text>
             </Pressable>
+
             <Pressable
               style={styles.continueButton}
               onPress={() => setFinishOpen(false)}
@@ -329,14 +355,49 @@ function DrinkButton({ emoji, label, count, onPress }: DrinkButtonProps) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
-  scroll: { flex: 1 },
-  container: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 30, gap: 14 },
-  topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },
-  liveText: { color: colors.accent, fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
-  timer: { marginTop: 4, color: colors.text, fontSize: 36, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  scroll: {
+    flex: 1,
+  },
+  container: {
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 112,
+    gap: 14,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  liveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.accent,
+  },
+  liveText: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+  },
+  timer: {
+    marginTop: 4,
+    color: colors.text,
+    fontSize: 36,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+  },
   venueBadge: {
     maxWidth: 132,
     flexDirection: 'row',
@@ -349,7 +410,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  venueText: { flexShrink: 1, color: colors.textMuted, fontSize: 12, fontWeight: '700' },
+  venueText: {
+    flexShrink: 1,
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   mapCard: {
     minHeight: 160,
     padding: 18,
@@ -368,13 +434,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.surfaceRaised,
   },
-  mapTitle: { marginTop: 12, color: colors.text, fontSize: 18, fontWeight: '900' },
-  mapText: { marginTop: 5, maxWidth: 360, color: colors.textMuted, fontSize: 13, lineHeight: 18 },
-  mapStats: { marginTop: 14, flexDirection: 'row', gap: 8 },
-  mapStat: { color: colors.text, fontSize: 13, fontWeight: '800' },
-  mapDivider: { color: colors.textMuted },
+  mapTitle: {
+    marginTop: 12,
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  mapText: {
+    marginTop: 5,
+    maxWidth: 360,
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  mapStats: {
+    marginTop: 14,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  mapStat: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  mapDivider: {
+    color: colors.textMuted,
+  },
   noticeBar: {
-    minHeight: 42,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -383,12 +470,25 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.surfaceRaised,
   },
-  noticeText: { flex: 1, color: colors.textMuted, fontSize: 12, fontWeight: '700' },
-  undoText: { color: colors.accent, fontSize: 11, fontWeight: '900' },
-  drinkGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  noticeText: {
+    flex: 1,
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  undoText: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  drinkGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
   drinkButton: {
-    width: '48.5%',
-    minHeight: 112,
+    width: '48%',
+    minHeight: 116,
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -397,22 +497,37 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  drinkButtonPressed: { backgroundColor: colors.surfaceRaised, transform: [{ scale: 0.985 }] },
-  drinkEmoji: { fontSize: 30 },
-  drinkLabel: { marginTop: 8, color: colors.text, fontSize: 13, fontWeight: '900', letterSpacing: 0.6 },
+  drinkButtonPressed: {
+    backgroundColor: colors.surfaceRaised,
+    transform: [{ scale: 0.985 }],
+  },
+  drinkEmoji: {
+    fontSize: 30,
+  },
+  drinkLabel: {
+    marginTop: 8,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
   countBadge: {
     position: 'absolute',
     top: 10,
     right: 10,
-    minWidth: 26,
-    height: 26,
+    minWidth: 27,
+    height: 27,
     paddingHorizontal: 7,
-    borderRadius: 13,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surfaceRaised,
   },
-  countText: { color: colors.textMuted, fontSize: 12, fontWeight: '900' },
+  countText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
+  },
   timelineCard: {
     padding: 18,
     borderRadius: 22,
@@ -420,44 +535,161 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  sectionEyebrow: { color: colors.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
-  sectionTitle: { marginTop: 3, color: colors.text, fontSize: 20, fontWeight: '900' },
-  eventCount: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
-  timelineList: { marginTop: 16, gap: 0 },
-  timelineRow: { minHeight: 48, flexDirection: 'row', alignItems: 'flex-start' },
-  timelineTime: { width: 45, paddingTop: 3, color: colors.textMuted, fontSize: 11, fontWeight: '800' },
-  timelineRail: { width: 18, minHeight: 48, alignItems: 'center' },
-  timelineDot: { width: 8, height: 8, marginTop: 5, borderRadius: 4, backgroundColor: colors.accent },
-  timelineLine: { width: 1, flex: 1, marginTop: 3, backgroundColor: colors.border },
-  timelineEmoji: { width: 30, fontSize: 18, lineHeight: 23 },
-  timelineCopy: { flex: 1, paddingTop: 1 },
-  timelineTitle: { color: colors.text, fontSize: 13, fontWeight: '800' },
-  timelineDetail: { marginTop: 2, color: colors.textMuted, fontSize: 11 },
-  venueButton: {
-    minHeight: 48,
+  sectionHeader: {
     flexDirection: 'row',
-    gap: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    opacity: 0.65,
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 12,
   },
-  venueButtonText: { color: colors.textMuted, fontSize: 12, fontWeight: '800' },
-  finishButton: {
+  sectionEyebrow: {
+    color: colors.accent,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.3,
+  },
+  sectionTitle: {
+    marginTop: 3,
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  eventCount: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  timelineList: {
+    marginTop: 18,
+    gap: 0,
+  },
+  timelineRow: {
     minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  timelineTime: {
+    width: 46,
+    paddingTop: 2,
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  timelineRail: {
+    width: 16,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+  },
+  timelineDot: {
+    width: 8,
+    height: 8,
+    marginTop: 4,
+    borderRadius: 4,
+    backgroundColor: colors.accent,
+  },
+  timelineLine: {
+    width: 1,
+    flex: 1,
+    marginTop: 3,
+    backgroundColor: colors.border,
+  },
+  timelineEmoji: {
+    width: 30,
+    marginLeft: 5,
+    fontSize: 18,
+  },
+  timelineCopy: {
+    flex: 1,
+    paddingBottom: 12,
+  },
+  timelineTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  timelineDetail: {
+    marginTop: 2,
+    color: colors.textMuted,
+    fontSize: 11,
+  },
+  finishButton: {
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 17,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.accent,
   },
-  finishButtonPressed: { backgroundColor: colors.surface },
-  finishButtonText: { color: colors.accent, fontSize: 13, fontWeight: '900', letterSpacing: 0.7 },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.68)' },
+  finishButtonPressed: {
+    backgroundColor: colors.surface,
+  },
+  finishButtonText: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+  },
+  emptyState: {
+    flex: 1,
+    paddingHorizontal: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceRaised,
+  },
+  emptyEyebrow: {
+    marginTop: 22,
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+  },
+  emptyTitle: {
+    marginTop: 8,
+    color: colors.text,
+    fontSize: 27,
+    textAlign: 'center',
+    fontWeight: '900',
+  },
+  emptyText: {
+    marginTop: 10,
+    maxWidth: 360,
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  startButton: {
+    minHeight: 56,
+    marginTop: 24,
+    paddingHorizontal: 26,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    borderRadius: 18,
+    backgroundColor: colors.accent,
+  },
+  startButtonText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  primaryPressed: {
+    backgroundColor: colors.accentPressed,
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.68)',
+  },
   sheet: {
     paddingHorizontal: 20,
     paddingTop: 10,
@@ -468,14 +700,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  sheetHandle: { width: 42, height: 5, alignSelf: 'center', borderRadius: 3, backgroundColor: colors.border },
-  sheetEyebrow: { marginTop: 22, color: colors.accent, fontSize: 12, fontWeight: '900', letterSpacing: 1.4 },
-  sheetTitle: { marginTop: 6, color: colors.text, fontSize: 28, fontWeight: '900' },
-  sheetText: { marginTop: 6, color: colors.textMuted, fontSize: 13, lineHeight: 19 },
-  beerOptions: { marginTop: 20, gap: 10 },
+  sheetHandle: {
+    width: 42,
+    height: 5,
+    alignSelf: 'center',
+    borderRadius: 3,
+    backgroundColor: colors.border,
+  },
+  sheetEyebrow: {
+    marginTop: 22,
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+  },
+  sheetTitle: {
+    marginTop: 5,
+    color: colors.text,
+    fontSize: 26,
+    fontWeight: '900',
+  },
+  sheetText: {
+    marginTop: 7,
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  beerOptions: {
+    marginTop: 18,
+    gap: 10,
+  },
   beerOption: {
-    minHeight: 66,
-    paddingHorizontal: 18,
+    minHeight: 68,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -484,58 +741,77 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  beerOptionPressed: { borderColor: colors.accent },
-  beerOptionText: { color: colors.text, fontSize: 17, fontWeight: '900' },
-  beerOptionHint: { marginTop: 2, color: colors.textMuted, fontSize: 11, fontWeight: '700' },
-  finishBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 22, backgroundColor: 'rgba(0,0,0,0.72)' },
+  beerOptionPressed: {
+    borderColor: colors.accent,
+  },
+  beerOptionText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  beerOptionHint: {
+    marginTop: 2,
+    color: colors.textMuted,
+    fontSize: 11,
+  },
+  finishBackdrop: {
+    flex: 1,
+    padding: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.74)',
+  },
   finishCard: {
     width: '100%',
-    maxWidth: 420,
-    padding: 24,
+    maxWidth: 440,
+    padding: 22,
     borderRadius: 26,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  finishEyebrow: { color: colors.accent, fontSize: 11, fontWeight: '900', letterSpacing: 1.5 },
-  finishTitle: { marginTop: 8, color: colors.text, fontSize: 27, lineHeight: 32, fontWeight: '900' },
-  finishSummary: { marginTop: 10, color: colors.textMuted, fontSize: 14, lineHeight: 20 },
+  finishEyebrow: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+  },
+  finishTitle: {
+    marginTop: 7,
+    color: colors.text,
+    fontSize: 25,
+    lineHeight: 30,
+    fontWeight: '900',
+  },
+  finishSummary: {
+    marginTop: 10,
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
   confirmFinish: {
     minHeight: 54,
-    marginTop: 24,
+    marginTop: 22,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 17,
     backgroundColor: colors.accent,
   },
-  confirmFinishText: { color: colors.text, fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
-  continueButton: { minHeight: 48, marginTop: 8, alignItems: 'center', justifyContent: 'center' },
-  continueButtonText: { color: colors.textMuted, fontSize: 13, fontWeight: '800' },
-  emptyState: { flex: 1, paddingHorizontal: 28, alignItems: 'center', justifyContent: 'center' },
-  emptyIcon: {
-    width: 76,
-    height: 76,
-    borderRadius: 26,
+  confirmFinishText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  continueButton: {
+    minHeight: 48,
+    marginTop: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  emptyEyebrow: { marginTop: 24, color: colors.accent, fontSize: 11, fontWeight: '900', letterSpacing: 1.5 },
-  emptyTitle: { marginTop: 7, color: colors.text, fontSize: 28, fontWeight: '900', textAlign: 'center' },
-  emptyText: { maxWidth: 340, marginTop: 10, color: colors.textMuted, fontSize: 14, lineHeight: 21, textAlign: 'center' },
-  startButton: {
-    minHeight: 56,
-    marginTop: 24,
-    paddingHorizontal: 26,
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-    backgroundColor: colors.accent,
+  continueButtonText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
   },
-  startButtonText: { color: colors.text, fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
-  primaryPressed: { backgroundColor: colors.accentPressed },
 });
