@@ -99,8 +99,15 @@ src/
 - [x] Ruta y distancia en directo
 - [x] Ruta persistida en el resumen final
 - [x] Ruta recuperada después de cerrar o recargar
+- [x] Leyenda explícita: inicio verde y última posición/final rojo
+- [x] Marcadores de consumiciones sobre la ruta
+- [x] Agrupación de consumiciones registradas a menos de 25 m para evitar saturar el mapa
+- [x] Badge agrupado por tipo de bebida (`🍺2 🍷 🥃`, etc.)
+- [x] Detalle en resumen con hora, lugar y consumición
+- [x] Lugar preparado para resolverse con el garito real en el Bloque 4
+- [x] Navegación al resumen sincronizada con el estado para evitar la pantalla blanca al terminar
 
-> Estado: **COMPLETADO para foreground**. `expo-location` soporta este tracking en Android, iOS y web. El tracking con la app en segundo plano/pantalla bloqueada se reserva para la fase nativa final porque requiere development build y permisos adicionales.
+> Estado: **COMPLETADO para foreground**. El mapa ya reconstruye ruta + inicio/final + consumiciones y el resumen enseña el detalle de cada grupo. Hasta implementar Garitos, el lugar de una consumición se muestra como `Sin garito`. El tracking con la app en segundo plano/pantalla bloqueada se reserva para la fase nativa final porque requiere development build y permisos adicionales.
 
 ## Bloque 4 — Garitos
 
