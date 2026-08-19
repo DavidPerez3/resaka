@@ -22,6 +22,7 @@ src/
 - Solo existen cuatro categorías de bebida: cerveza, kalimotxo, chupito y copa.
 - Solo la cerveza tiene tamaño: quinto, tercio o litrona.
 - GPS y almacenamiento se consumen mediante interfaces para poder cambiar implementaciones sin tocar el dominio.
+- Los garitos se obtienen desde proveedores reales; no se mantienen listas mockeadas dentro de la app.
 - Primero funcionalidad local; Supabase se integra cuando el flujo principal esté estable.
 - La preview web se publica desde `main` mediante GitHub Actions y Expo Web.
 
@@ -105,19 +106,32 @@ src/
 - [x] Badge agrupado por tipo de bebida (`🍺2 🍷 🥃`, etc.)
 - [x] Detalle en resumen con hora, lugar y consumición
 - [x] Lugar preparado para resolverse con el garito real en el Bloque 4
-- [x] Navegación al resumen sincronizada con el estado para evitar la pantalla blanca al terminar
+- [x] Finalización con navegación directa al resumen y fallback persistido
 
-> Estado: **COMPLETADO para foreground**. El mapa ya reconstruye ruta + inicio/final + consumiciones y el resumen enseña el detalle de cada grupo. Hasta implementar Garitos, el lugar de una consumición se muestra como `Sin garito`. El tracking con la app en segundo plano/pantalla bloqueada se reserva para la fase nativa final porque requiere development build y permisos adicionales.
+> Estado: **COMPLETADO para foreground**. El mapa reconstruye ruta + inicio/final + garitos + consumiciones. El tracking con la app en segundo plano/pantalla bloqueada se reserva para la fase nativa final porque requiere development build y permisos adicionales.
 
 ## Bloque 4 — Garitos
 
-- [ ] Modelo Venue
-- [ ] Garito actual
-- [ ] Cambiar de garito
-- [ ] Stops y timestamps de entrada/salida
-- [ ] Búsqueda/cercanía
-- [ ] Creación manual
-- [ ] Garitos en timeline y resumen
+- [x] Modelo `Venue` y `OutingStop`
+- [x] Contrato `VenueProvider` intercambiable
+- [x] Proveedor real OpenStreetMap / Overpass sin garitos mockeados
+- [x] Búsqueda GPS en un radio inicial de 500 m
+- [x] Resultados ordenados por distancia
+- [x] Filtro local por nombre sin llamadas de autocomplete
+- [x] Garito actual
+- [x] Cambiar de garito durante una salida
+- [x] Cierre automático de la parada anterior al cambiar
+- [x] Timestamps de entrada y salida
+- [x] Creación manual en la posición GPS actual como fallback
+- [x] Persistencia y migración automática a snapshot v4
+- [x] Reutilización local de garitos ya conocidos
+- [x] Asociación de cada nueva consumición al garito activo
+- [x] Nombre real del garito en el detalle de consumiciones del mapa
+- [x] Marcadores de garitos sobre el mapa
+- [x] Garitos en timeline
+- [x] Garitos en resumen con entrada, salida, duración y bebidas
+
+> Estado: **COMPLETADO funcionalmente**. La fuente inicial es OpenStreetMap mediante Overpass y está encapsulada detrás de `VenueProvider`, por lo que se podrá sustituir por Google Places u otro proveedor sin cambiar el dominio ni el flujo de la salida. No hay ningún garito mockeado.
 
 ## Bloque 5 — Backend y cuentas
 
