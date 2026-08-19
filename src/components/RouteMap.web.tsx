@@ -18,11 +18,18 @@ type RouteMapProps = {
   endLabel?: string;
 };
 
+type VenueMarker = { id: string; latitude: number; longitude: number };
+
 function escapeJsonForHtml(value: unknown) {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
-function buildMapHtml(points: LocationPoint[], drinkClusters: DrinkMapCluster[], endLabel: string) {
+function buildMapHtml(
+  points: LocationPoint[],
+  drinkClusters: DrinkMapCluster[],
+  venueMarkers: VenueMarker[],
+  endLabel: string,
+) {
   const coordinates = points.map((point) => [point.latitude, point.longitude]);
   const drinkMarkers = drinkClusters.map((cluster) => ({
     latitude: cluster.latitude,
@@ -31,6 +38,7 @@ function buildMapHtml(points: LocationPoint[], drinkClusters: DrinkMapCluster[],
   }));
   const safeCoordinates = escapeJsonForHtml(coordinates);
   const safeDrinkMarkers = escapeJsonForHtml(drinkMarkers);
+  const safeVenueMarkers = escapeJsonForHtml(venueMarkers);
   const safeEndLabel = escapeJsonForHtml(endLabel);
 
   return `<!doctype html>
@@ -51,6 +59,7 @@ function buildMapHtml(points: LocationPoint[], drinkClusters: DrinkMapCluster[],
     .end{background:#E84A5F}
     .drink-marker{box-sizing:border-box;height:38px;display:flex;align-items:center;justify-content:center;gap:7px;padding:0 10px;border-radius:19px;background:rgba(11,13,18,.95);border:2px solid #F7F2E8;color:#F7F2E8;box-shadow:0 3px 10px rgba(0,0,0,.28);white-space:nowrap;overflow:hidden}
     .drink-token{display:inline-flex;align-items:center;justify-content:center;min-width:26px;font:900 15px/1 system-ui,-apple-system,sans-serif;white-space:nowrap}
+    .venue-marker{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:15px;background:rgba(11,13,18,.94);border:2px solid #E84A5F;font-size:16px;box-shadow:0 3px 10px rgba(0,0,0,.25)}
   </style>
 </head>
 <body>
@@ -60,10 +69,12 @@ function buildMapHtml(points: LocationPoint[], drinkClusters: DrinkMapCluster[],
   <script>
     const points = ${safeCoordinates};
     const drinks = ${safeDrinkMarkers};
+    const venues = ${safeVenueMarkers};
     const endLabel = ${safeEndLabel};
     const legend = document.getElementById('legend');
     legend.innerHTML = '<div class="legend-item"><span class="dot start"></span><span>Inicio</span></div>' +
       (points.length > 1 ? '<div class="legend-item"><span class="dot end"></span><span>' + endLabel + '</span></div>' : '') +
+      (venues.length > 0 ? '<div class="legend-item"><span>📍</span><span>Garito</span></div>' : '') +
       (drinks.length > 0 ? '<div class="legend-item"><span>🍺</span><span>Consumición</span></div>' : '');
 
     const map = L.map('map', { zoomControl: false, attributionControl: true });
@@ -81,6 +92,16 @@ function buildMapHtml(points: LocationPoint[], drinkClusters: DrinkMapCluster[],
       L.circleMarker(points[points.length-1], {radius:7,color:'#E84A5F',fillColor:'#E84A5F',fillOpacity:1,weight:3}).addTo(map);
       map.fitBounds(route.getBounds(), {padding:[30,30],maxZoom:17});
     }
+
+    venues.forEach((venue) => {
+      const icon = L.divIcon({
+        className: '',
+        html: '<div class="venue-marker">📍</div>',
+        iconSize: [30,30],
+        iconAnchor: [15,15]
+      });
+      L.marker([venue.latitude, venue.longitude], { icon, interactive: false }).addTo(map);
+    });
 
     drinks.forEach((drink) => {
       const tokenCount = Math.max(1, drink.tokens.length);
@@ -107,17 +128,40 @@ export function RouteMap({
   height = 220,
   endLabel = 'Última posición',
 }: RouteMapProps) {
-  const { activeOuting, drinks, lastFinishedOuting } = useOutingSession();
+  const { activeOuting, drinks, stops, knownVenues, lastFinishedOuting } = useOutingSession();
+
+  const sourceVenues = activeOuting ? knownVenues : (lastFinishedOuting?.venues ?? knownVenues);
+  const sourceStops = activeOuting ? stops : (lastFinishedOuting?.stops ?? []);
 
   const resolvedDrinkClusters = useMemo(() => {
     if (drinkClusters) return drinkClusters;
     const sourceDrinks = activeOuting ? drinks : (lastFinishedOuting?.drinks ?? []);
-    return buildDrinkMapClusters(sourceDrinks);
-  }, [activeOuting, drinkClusters, drinks, lastFinishedOuting]);
+    const venueById = new Map(sourceVenues.map((venue) => [venue.id, venue.name]));
+    return buildDrinkMapClusters(
+      sourceDrinks,
+      (drink) => (drink.venueId ? venueById.get(drink.venueId) ?? 'Sin garito' : 'Sin garito'),
+    );
+  }, [activeOuting, drinkClusters, drinks, lastFinishedOuting, sourceVenues]);
+
+  const venueMarkers = useMemo(() => {
+    const venueById = new Map(sourceVenues.map((venue) => [venue.id, venue]));
+    const unique = new Map<string, VenueMarker>();
+    for (const stop of sourceStops) {
+      const venue = venueById.get(stop.venueId);
+      if (venue) {
+        unique.set(venue.id, {
+          id: venue.id,
+          latitude: venue.latitude,
+          longitude: venue.longitude,
+        });
+      }
+    }
+    return Array.from(unique.values());
+  }, [sourceStops, sourceVenues]);
 
   const srcDoc = useMemo(
-    () => buildMapHtml(points, resolvedDrinkClusters, endLabel),
-    [endLabel, points, resolvedDrinkClusters],
+    () => buildMapHtml(points, resolvedDrinkClusters, venueMarkers, endLabel),
+    [endLabel, points, resolvedDrinkClusters, venueMarkers],
   );
 
   if (points.length === 0) {
