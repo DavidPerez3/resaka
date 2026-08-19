@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
-import { buildDrinkClusterBadge, type DrinkMapCluster } from '@/domain/drinkMap';
+import { DrinkMapDetails } from '@/components/DrinkMapDetails';
+import {
+  buildDrinkClusterBadge,
+  buildDrinkMapClusters,
+  type DrinkMapCluster,
+} from '@/domain/drinkMap';
+import { useOutingSession } from '@/features/outing/OutingSessionContext';
 import type { LocationPoint } from '@/services/location/types';
 import { colors } from '@/theme/colors';
 
@@ -15,11 +21,18 @@ type RouteMapProps = {
 
 export function RouteMap({
   points,
-  drinkClusters = [],
+  drinkClusters,
   height = 220,
   endLabel = 'Última posición',
 }: RouteMapProps) {
   const mapRef = useRef<MapView | null>(null);
+  const { activeOuting, drinks, lastFinishedOuting } = useOutingSession();
+
+  const resolvedDrinkClusters = useMemo(() => {
+    if (drinkClusters) return drinkClusters;
+    const sourceDrinks = activeOuting ? drinks : (lastFinishedOuting?.drinks ?? []);
+    return buildDrinkMapClusters(sourceDrinks);
+  }, [activeOuting, drinkClusters, drinks, lastFinishedOuting]);
 
   const coordinates = useMemo(
     () => points.map((point) => ({ latitude: point.latitude, longitude: point.longitude })),
@@ -62,70 +75,76 @@ export function RouteMap({
 
   const first = coordinates[0];
   const last = coordinates[coordinates.length - 1];
+  const showDetails = !activeOuting && resolvedDrinkClusters.length > 0;
 
   return (
-    <View style={[styles.frame, { height }]} pointerEvents="none">
-      <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFill}
-        initialRegion={{
-          ...first,
-          latitudeDelta: 0.006,
-          longitudeDelta: 0.006,
-        }}
-        showsUserLocation
-        showsMyLocationButton={false}
-        toolbarEnabled={false}
-        scrollEnabled={false}
-        zoomEnabled={false}
-        rotateEnabled={false}
-        pitchEnabled={false}
-      >
-        {coordinates.length > 1 ? (
-          <Polyline coordinates={coordinates} strokeColor={colors.accent} strokeWidth={5} />
-        ) : null}
+    <View style={styles.wrapper}>
+      <View style={[styles.frame, { height }]} pointerEvents="none">
+        <MapView
+          ref={mapRef}
+          style={StyleSheet.absoluteFill}
+          initialRegion={{
+            ...first,
+            latitudeDelta: 0.006,
+            longitudeDelta: 0.006,
+          }}
+          showsUserLocation
+          showsMyLocationButton={false}
+          toolbarEnabled={false}
+          scrollEnabled={false}
+          zoomEnabled={false}
+          rotateEnabled={false}
+          pitchEnabled={false}
+        >
+          {coordinates.length > 1 ? (
+            <Polyline coordinates={coordinates} strokeColor={colors.accent} strokeWidth={5} />
+          ) : null}
 
-        {drinkClusters.map((cluster) => (
-          <Marker
-            key={cluster.id}
-            coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
-            tracksViewChanges={false}
-          >
-            <View style={styles.drinkMarker}>
-              <Text style={styles.drinkMarkerText}>{buildDrinkClusterBadge(cluster)}</Text>
+          {resolvedDrinkClusters.map((cluster) => (
+            <Marker
+              key={cluster.id}
+              coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
+              tracksViewChanges={false}
+            >
+              <View style={styles.drinkMarker}>
+                <Text style={styles.drinkMarkerText}>{buildDrinkClusterBadge(cluster)}</Text>
+              </View>
+            </Marker>
+          ))}
+
+          <Marker coordinate={first} title="Inicio" pinColor={colors.success} />
+          {coordinates.length > 1 ? (
+            <Marker coordinate={last} title={endLabel} pinColor={colors.accent} />
+          ) : null}
+        </MapView>
+
+        <View style={styles.legend}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, styles.startDot]} />
+            <Text style={styles.legendText}>Inicio</Text>
+          </View>
+          {coordinates.length > 1 ? (
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, styles.endDot]} />
+              <Text style={styles.legendText}>{endLabel}</Text>
             </View>
-          </Marker>
-        ))}
-
-        <Marker coordinate={first} title="Inicio" pinColor={colors.success} />
-        {coordinates.length > 1 ? (
-          <Marker coordinate={last} title={endLabel} pinColor={colors.accent} />
-        ) : null}
-      </MapView>
-
-      <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, styles.startDot]} />
-          <Text style={styles.legendText}>Inicio</Text>
+          ) : null}
+          {resolvedDrinkClusters.length > 0 ? (
+            <View style={styles.legendItem}>
+              <Text style={styles.legendDrink}>🍺</Text>
+              <Text style={styles.legendText}>Consumición</Text>
+            </View>
+          ) : null}
         </View>
-        {coordinates.length > 1 ? (
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, styles.endDot]} />
-            <Text style={styles.legendText}>{endLabel}</Text>
-          </View>
-        ) : null}
-        {drinkClusters.length > 0 ? (
-          <View style={styles.legendItem}>
-            <Text style={styles.legendDrink}>🍺</Text>
-            <Text style={styles.legendText}>Consumición</Text>
-          </View>
-        ) : null}
       </View>
+
+      {showDetails ? <DrinkMapDetails clusters={resolvedDrinkClusters} /> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: { gap: 13 },
   frame: {
     overflow: 'hidden',
     borderRadius: 22,
