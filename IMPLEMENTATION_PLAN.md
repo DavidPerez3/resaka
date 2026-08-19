@@ -35,7 +35,7 @@ src/
 - Solo la cerveza tiene tamaño: quinto, tercio o litrona.
 - GPS y almacenamiento se consumen mediante interfaces para poder tener implementaciones específicas por plataforma.
 - Primero funcionalidad local; Supabase se integra cuando el flujo principal esté estable.
-- La preview web se preparará para GitHub Pages, pero las capacidades móviles avanzadas se validarán mediante Expo Go/development builds.
+- La preview web se publica desde `main` mediante GitHub Actions y Expo Web.
 
 ## Fase 0 — Scaffold
 
@@ -46,22 +46,23 @@ src/
 - [x] Modelos `Outing` y `DrinkEntry`
 - [x] Contrato `LocationTracker`
 - [x] Contrato de almacenamiento
-- [ ] Instalar dependencias y validar build
-- [ ] Configurar despliegue web en GitHub Pages
+- [x] Workflow de build/deploy para GitHub Pages
+- [ ] Validar el primer build remoto
+- [ ] Habilitar GitHub Pages con Source = GitHub Actions (ajuste único del repositorio)
 
 ## Fase 1 — Salida local
 
-- [ ] Navegación inferior
-- [ ] Empezar salida
-- [ ] Cronómetro
-- [ ] Pantalla de salida activa
-- [ ] Cerveza: quinto / tercio / litrona
-- [ ] Kalimotxo one-tap
-- [ ] Chupito one-tap
-- [ ] Copa one-tap
-- [ ] Undo
+- [x] Navegación inferior
+- [x] Empezar salida
+- [x] Cronómetro
+- [x] Pantalla de salida activa
+- [x] Cerveza: quinto / tercio / litrona
+- [x] Kalimotxo one-tap
+- [x] Chupito one-tap
+- [x] Copa one-tap
+- [x] Undo
 - [ ] Timeline local
-- [ ] Terminar salida
+- [x] Confirmación para terminar salida
 - [ ] Resumen
 
 ## Fase 2 — Dispositivo
