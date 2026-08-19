@@ -20,7 +20,15 @@
       "output": "single",
       "bundler": "metro"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "RESAKA usa tu ubicación mientras una salida está activa para dibujar el recorrido de la noche."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true,
       "baseUrl": "/resaka"
