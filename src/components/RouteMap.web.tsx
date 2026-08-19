@@ -1,7 +1,13 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { buildDrinkClusterBadge, type DrinkMapCluster } from '@/domain/drinkMap';
+import { DrinkMapDetails } from '@/components/DrinkMapDetails';
+import {
+  buildDrinkClusterBadge,
+  buildDrinkMapClusters,
+  type DrinkMapCluster,
+} from '@/domain/drinkMap';
+import { useOutingSession } from '@/features/outing/OutingSessionContext';
 import type { LocationPoint } from '@/services/location/types';
 import { colors } from '@/theme/colors';
 
@@ -92,13 +98,21 @@ function buildMapHtml(points: LocationPoint[], drinkClusters: DrinkMapCluster[],
 
 export function RouteMap({
   points,
-  drinkClusters = [],
+  drinkClusters,
   height = 220,
   endLabel = 'Última posición',
 }: RouteMapProps) {
+  const { activeOuting, drinks, lastFinishedOuting } = useOutingSession();
+
+  const resolvedDrinkClusters = useMemo(() => {
+    if (drinkClusters) return drinkClusters;
+    const sourceDrinks = activeOuting ? drinks : (lastFinishedOuting?.drinks ?? []);
+    return buildDrinkMapClusters(sourceDrinks);
+  }, [activeOuting, drinkClusters, drinks, lastFinishedOuting]);
+
   const srcDoc = useMemo(
-    () => buildMapHtml(points, drinkClusters, endLabel),
-    [drinkClusters, endLabel, points],
+    () => buildMapHtml(points, resolvedDrinkClusters, endLabel),
+    [endLabel, points, resolvedDrinkClusters],
   );
 
   if (points.length === 0) {
@@ -111,25 +125,32 @@ export function RouteMap({
     );
   }
 
+  const showDetails = !activeOuting && resolvedDrinkClusters.length > 0;
+
   return (
-    <View style={[styles.frame, { height }]} pointerEvents="none">
-      {React.createElement('iframe', {
-        title: 'Ruta de la salida',
-        srcDoc,
-        sandbox: 'allow-scripts',
-        style: {
-          width: '100%',
-          height: '100%',
-          border: 0,
-          display: 'block',
-          pointerEvents: 'none',
-        },
-      })}
+    <View style={styles.wrapper}>
+      <View style={[styles.frame, { height }]} pointerEvents="none">
+        {React.createElement('iframe', {
+          title: 'Ruta de la salida',
+          srcDoc,
+          sandbox: 'allow-scripts',
+          style: {
+            width: '100%',
+            height: '100%',
+            border: 0,
+            display: 'block',
+            pointerEvents: 'none',
+          },
+        })}
+      </View>
+
+      {showDetails ? <DrinkMapDetails clusters={resolvedDrinkClusters} /> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: { gap: 13 },
   frame: {
     overflow: 'hidden',
     borderRadius: 22,
