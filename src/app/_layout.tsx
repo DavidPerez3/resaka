@@ -3,64 +3,74 @@ import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View } from 'react-native';
 
+import { OutingSessionProvider, useOutingSession } from '@/features/outing/OutingSessionContext';
 import { colors } from '@/theme/colors';
+
+function RootTabs() {
+  const { activeOuting } = useOutingSession();
+
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.text,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarStyle: styles.tabBar,
+        tabBarLabelStyle: styles.tabBarLabel,
+        tabBarHideOnKeyboard: true,
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Inicio',
+          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          title: 'Explorar',
+          tabBarIcon: ({ color, size }) => <Ionicons name="compass-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="outing"
+        options={{
+          title: activeOuting ? 'En curso' : 'Salida',
+          tabBarLabelStyle: styles.recordLabel,
+          tabBarIcon: ({ focused }) => (
+            <View style={[styles.recordButton, focused && styles.recordButtonFocused]}>
+              <Ionicons name={activeOuting ? 'radio' : 'add'} color={colors.text} size={activeOuting ? 24 : 31} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="clubs"
+        options={{
+          title: 'Cuadrillas',
+          tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Perfil',
+          tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen name="summary" options={{ href: null }} />
+    </Tabs>
+  );
+}
 
 export default function RootLayout() {
   return (
-    <>
+    <OutingSessionProvider>
       <StatusBar style="light" />
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: colors.text,
-          tabBarInactiveTintColor: colors.textMuted,
-          tabBarStyle: styles.tabBar,
-          tabBarLabelStyle: styles.tabBarLabel,
-          tabBarHideOnKeyboard: true,
-        }}
-      >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: 'Inicio',
-            tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
-          }}
-        />
-        <Tabs.Screen
-          name="explore"
-          options={{
-            title: 'Explorar',
-            tabBarIcon: ({ color, size }) => <Ionicons name="compass-outline" color={color} size={size} />,
-          }}
-        />
-        <Tabs.Screen
-          name="outing"
-          options={{
-            title: 'Salida',
-            tabBarLabelStyle: styles.recordLabel,
-            tabBarIcon: ({ focused }) => (
-              <View style={[styles.recordButton, focused && styles.recordButtonFocused]}>
-                <Ionicons name="add" color={colors.text} size={31} />
-              </View>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="clubs"
-          options={{
-            title: 'Cuadrillas',
-            tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" color={color} size={size} />,
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Perfil',
-            tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" color={color} size={size} />,
-          }}
-        />
-      </Tabs>
-    </>
+      <RootTabs />
+    </OutingSessionProvider>
   );
 }
 
