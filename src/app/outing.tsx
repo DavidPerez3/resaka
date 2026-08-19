@@ -63,6 +63,7 @@ export default function OutingScreen() {
     activeOuting,
     drinks,
     routePoints,
+    lastFinishedOuting,
     locationStatus,
     locationError,
     retryLocationTracking,
@@ -75,6 +76,7 @@ export default function OutingScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [beerPickerOpen, setBeerPickerOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
+  const [shouldOpenSummary, setShouldOpenSummary] = useState(false);
   const [notice, setNotice] = useState('Todo listo para dejar constancia.');
 
   useEffect(() => {
@@ -92,6 +94,13 @@ export default function OutingScreen() {
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [activeOuting]);
+
+  useEffect(() => {
+    if (!shouldOpenSummary || !lastFinishedOuting) return;
+
+    setShouldOpenSummary(false);
+    router.replace('/summary');
+  }, [lastFinishedOuting, shouldOpenSummary]);
 
   const counts = useMemo(
     () => ({
@@ -134,7 +143,7 @@ export default function OutingScreen() {
     setFinishOpen(false);
 
     if (finished) {
-      router.replace('/summary');
+      setShouldOpenSummary(true);
     }
   };
 
