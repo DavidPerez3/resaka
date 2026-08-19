@@ -80,13 +80,27 @@ src/
 
 ## Bloque 3 — GPS y recorrido
 
-- [ ] Permisos GPS
-- [ ] Tracking foreground
-- [ ] Route points
-- [ ] Filtro de accuracy y GPS spikes
-- [ ] Cálculo de distancia
-- [ ] Mapa y polyline
-- [ ] Ruta en el resumen
+- [x] Permiso de ubicación foreground
+- [x] Tracking foreground con `expo-location`
+- [x] `RoutePoint` multiplataforma
+- [x] Persistencia y recuperación de route points
+- [x] Migración automática de snapshots del Bloque 2 a la nueva versión
+- [x] Filtro de coordenadas inválidas
+- [x] Filtro de accuracy muy mala
+- [x] Umbral mínimo de distancia entre puntos
+- [x] Filtro básico de GPS spikes por velocidad implícita imposible
+- [x] Distancia Haversine acumulada
+- [x] Estado de GPS: buscando / activo / denegado / error
+- [x] Reintento de permiso/tracking sin bloquear la salida
+- [x] Coordenadas de la última posición asociadas a nuevas bebidas
+- [x] Mapa web con OpenStreetMap y polyline
+- [x] Mapa nativo con `react-native-maps`
+- [x] Mapa configurado para no bloquear el scroll de la pantalla
+- [x] Ruta y distancia en directo
+- [x] Ruta persistida en el resumen final
+- [x] Ruta recuperada después de cerrar o recargar
+
+> Estado: **COMPLETADO para foreground**. `expo-location` soporta este tracking en Android, iOS y web. El tracking con la app en segundo plano/pantalla bloqueada se reserva para la fase nativa final porque requiere development build y permisos adicionales.
 
 ## Bloque 4 — Garitos
 
