@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteMap } from '@/components/RouteMap';
 import { formatDistance } from '@/domain/route';
 import { buildOutingTimeline, formatTimelineTime } from '@/domain/timeline';
+import { formatStopDuration } from '@/domain/venues';
 import { useOutingSession } from '@/features/outing/OutingSessionContext';
 import { colors } from '@/theme/colors';
 
@@ -31,11 +32,19 @@ function formatDate(timestamp: string) {
 
 export default function SummaryScreen() {
   const { lastFinishedOuting, clearLastFinishedOuting, startOuting } = useOutingSession();
+  const stops = lastFinishedOuting?.stops ?? [];
+  const venues = lastFinishedOuting?.venues ?? [];
+  const venueById = useMemo(() => new Map(venues.map((venue) => [venue.id, venue])), [venues]);
 
   const timeline = useMemo(
     () =>
       lastFinishedOuting
-        ? buildOutingTimeline(lastFinishedOuting.outing, lastFinishedOuting.drinks)
+        ? buildOutingTimeline(
+            lastFinishedOuting.outing,
+            lastFinishedOuting.drinks,
+            lastFinishedOuting.stops,
+            lastFinishedOuting.venues,
+          )
         : [],
     [lastFinishedOuting],
   );
@@ -69,7 +78,7 @@ export default function SummaryScreen() {
     );
   }
 
-  const { outing, routePoints } = lastFinishedOuting;
+  const { outing, routePoints, drinks } = lastFinishedOuting;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -93,11 +102,12 @@ export default function SummaryScreen() {
           <Stat value={formatDuration(outing.startedAt, outing.endedAt)} label="Duración" wide />
           <Stat value={`${stats.total}`} label="Bebidas" />
           <Stat value={formatDistance(outing.distanceMeters)} label="Distancia" />
+          {stops.length > 0 ? <Stat value={`${stops.length}`} label="Garitos" /> : null}
         </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeading}>
-            <Text style={styles.sectionEyebrow}>POR DÓNDE ACABASTE</Text>
+            <Text style={styles.sectionEyebrow}>POR DÓNDE FUISTE</Text>
             <Text style={styles.sectionTitle}>Ruta</Text>
           </View>
           <RouteMap points={routePoints} height={235} />
@@ -110,6 +120,48 @@ export default function SummaryScreen() {
             </Text>
           </View>
         </View>
+
+        {stops.length > 0 ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeading}>
+              <Text style={styles.sectionEyebrow}>PARADAS</Text>
+              <Text style={styles.sectionTitle}>Garitos</Text>
+            </View>
+            <View style={styles.stopList}>
+              {stops.map((stop, index) => {
+                const venue = venueById.get(stop.venueId);
+                const arrival = new Date(stop.arrivedAt).getTime();
+                const departure = stop.departedAt ? new Date(stop.departedAt).getTime() : Infinity;
+                const stopDrinkCount = drinks.filter((drink) => {
+                  const timestamp = new Date(drink.timestamp).getTime();
+                  return drink.venueId === stop.venueId && timestamp >= arrival && timestamp <= departure;
+                }).length;
+
+                return (
+                  <View key={stop.id} style={styles.stopCard}>
+                    <View style={styles.stopIndex}>
+                      <Text style={styles.stopIndexText}>{index + 1}</Text>
+                    </View>
+                    <View style={styles.stopCopy}>
+                      <Text style={styles.stopName}>{venue?.name ?? 'Garito'}</Text>
+                      {venue?.address ? <Text style={styles.stopAddress}>{venue.address}</Text> : null}
+                      <View style={styles.stopMetaRow}>
+                        <Text style={styles.stopMeta}>
+                          {formatTimelineTime(stop.arrivedAt)} → {stop.departedAt ? formatTimelineTime(stop.departedAt) : 'fin'}
+                        </Text>
+                        <Text style={styles.stopMeta}>{formatStopDuration(stop.arrivedAt, stop.departedAt)}</Text>
+                        <Text style={styles.stopMeta}>
+                          {stopDrinkCount} bebida{stopDrinkCount === 1 ? '' : 's'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.stopPin}>📍</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <View style={styles.sectionHeading}>
@@ -163,7 +215,7 @@ export default function SummaryScreen() {
           <View style={styles.savedCopy}>
             <Text style={styles.savedTitle}>Guardado en este dispositivo</Text>
             <Text style={styles.savedText}>
-              Bebidas, tiempos y ruta sobreviven a cierres y recargas. La sincronización entre dispositivos llegará con tu cuenta.
+              Bebidas, tiempos, garitos y ruta sobreviven a cierres y recargas. La sincronización entre dispositivos llegará con tu cuenta.
             </Text>
           </View>
         </View>
@@ -270,6 +322,33 @@ const styles = StyleSheet.create({
   },
   routeSummaryValue: { minWidth: 68, color: colors.text, fontSize: 17, fontWeight: '900' },
   routeSummaryText: { flex: 1, color: colors.textMuted, fontSize: 11, lineHeight: 16 },
+  stopList: { gap: 9 },
+  stopCard: {
+    minHeight: 82,
+    padding: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    borderRadius: 19,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  stopIndex: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: colors.surfaceRaised,
+  },
+  stopIndexText: { color: colors.accent, fontSize: 13, fontWeight: '900' },
+  stopCopy: { flex: 1 },
+  stopName: { color: colors.text, fontSize: 15, fontWeight: '900' },
+  stopAddress: { marginTop: 2, color: colors.textMuted, fontSize: 10, lineHeight: 14 },
+  stopMetaRow: { marginTop: 6, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  stopMeta: { color: colors.textMuted, fontSize: 10, fontWeight: '700' },
+  stopPin: { fontSize: 18 },
   drinkGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   drinkStat: {
     width: '48.5%',
