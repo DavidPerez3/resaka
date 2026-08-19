@@ -5,6 +5,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RouteMap } from '@/components/RouteMap';
+import { VenuePickerSheet } from '@/components/VenuePickerSheet';
 import type { BeerSize, DrinkType } from '@/domain/drinks';
 import { formatDistance } from '@/domain/route';
 import { buildOutingTimeline, formatTimelineTime } from '@/domain/timeline';
@@ -63,7 +64,9 @@ export default function OutingScreen() {
     activeOuting,
     drinks,
     routePoints,
-    lastFinishedOuting,
+    stops,
+    knownVenues,
+    currentVenue,
     locationStatus,
     locationError,
     retryLocationTracking,
@@ -75,8 +78,8 @@ export default function OutingScreen() {
 
   const [elapsed, setElapsed] = useState(0);
   const [beerPickerOpen, setBeerPickerOpen] = useState(false);
+  const [venuePickerOpen, setVenuePickerOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
-  const [shouldOpenSummary, setShouldOpenSummary] = useState(false);
   const [notice, setNotice] = useState('Todo listo para dejar constancia.');
 
   useEffect(() => {
@@ -95,13 +98,6 @@ export default function OutingScreen() {
     return () => clearInterval(interval);
   }, [activeOuting]);
 
-  useEffect(() => {
-    if (!shouldOpenSummary || !lastFinishedOuting) return;
-
-    setShouldOpenSummary(false);
-    router.replace('/summary');
-  }, [lastFinishedOuting, shouldOpenSummary]);
-
   const counts = useMemo(
     () => ({
       beer: drinks.filter((drink) => drink.type === 'BEER').length,
@@ -113,13 +109,15 @@ export default function OutingScreen() {
   );
 
   const timeline = useMemo(
-    () => (activeOuting ? buildOutingTimeline(activeOuting, drinks) : []),
-    [activeOuting, drinks],
+    () => (activeOuting ? buildOutingTimeline(activeOuting, drinks, stops, knownVenues) : []),
+    [activeOuting, drinks, knownVenues, stops],
   );
 
   const logDrink = (type: DrinkType, label: string, beerSize?: BeerSize) => {
     const result = addDrink({ type, beerSize });
-    if (result) setNotice(`${label} añadido.`);
+    if (result) {
+      setNotice(`${label} añadido${currentVenue ? ` · ${currentVenue.name}` : ''}.`);
+    }
   };
 
   const addBeer = (size: BeerSize, label: string) => {
@@ -141,10 +139,7 @@ export default function OutingScreen() {
   const handleFinish = () => {
     const finished = finishOuting();
     setFinishOpen(false);
-
-    if (finished) {
-      setShouldOpenSummary(true);
-    }
+    if (finished) router.replace('/summary');
   };
 
   if (!activeOuting) {
@@ -157,7 +152,7 @@ export default function OutingScreen() {
           <Text style={styles.emptyEyebrow}>SIN SALIDA ACTIVA</Text>
           <Text style={styles.emptyTitle}>Todavía no consta nada.</Text>
           <Text style={styles.emptyText}>
-            Empieza una salida y RESAKA guardará bebidas, tiempo y recorrido. Al iniciar te pediremos permiso para usar el GPS.
+            Empieza una salida y RESAKA guardará bebidas, tiempo, garitos y recorrido. Al iniciar te pediremos permiso para usar el GPS.
           </Text>
           <Pressable
             style={({ pressed }) => [styles.startButton, pressed && styles.primaryPressed]}
@@ -196,10 +191,16 @@ export default function OutingScreen() {
             <Text style={styles.timer}>{formatElapsed(elapsed)}</Text>
           </View>
 
-          <View style={styles.venueBadge}>
-            <Ionicons name="location-outline" color={colors.textMuted} size={16} />
-            <Text style={styles.venueText}>Sin garito</Text>
-          </View>
+          <Pressable
+            style={({ pressed }) => [styles.venueBadge, pressed && styles.venueBadgePressed]}
+            onPress={() => setVenuePickerOpen(true)}
+            accessibilityRole="button"
+          >
+            <Ionicons name="location-outline" color={currentVenue ? colors.accent : colors.textMuted} size={16} />
+            <Text style={[styles.venueText, currentVenue && styles.venueTextActive]} numberOfLines={1}>
+              {currentVenue?.name ?? 'Sin garito'}
+            </Text>
+          </Pressable>
         </View>
 
         <View style={styles.routeSection}>
@@ -222,6 +223,24 @@ export default function OutingScreen() {
               <Text style={styles.routeMetaText}>precisión ±{Math.round(latestPoint.accuracy)} m</Text>
             ) : null}
           </View>
+
+          <Pressable
+            style={({ pressed }) => [styles.venueAction, pressed && styles.venueActionPressed]}
+            onPress={() => setVenuePickerOpen(true)}
+            accessibilityRole="button"
+          >
+            <View style={styles.venueActionIcon}>
+              <Ionicons name="location" color={colors.accent} size={20} />
+            </View>
+            <View style={styles.venueActionCopy}>
+              <Text style={styles.venueActionEyebrow}>{currentVenue ? 'GARITO ACTUAL' : 'SIN GARITO'}</Text>
+              <Text style={styles.venueActionTitle}>{currentVenue?.name ?? '¿Dónde estás?'}</Text>
+              <Text style={styles.venueActionText}>
+                {currentVenue ? 'Toca para cambiar de garito.' : 'Busca bares reales alrededor de tu GPS.'}
+              </Text>
+            </View>
+            <Text style={styles.venueActionButton}>{currentVenue ? 'CAMBIAR' : 'ELEGIR'}</Text>
+          </Pressable>
 
           {locationStatus === 'denied' || locationStatus === 'error' ? (
             <View style={styles.gpsWarning}>
@@ -293,13 +312,13 @@ export default function OutingScreen() {
             {timeline
               .slice()
               .reverse()
-              .slice(0, 6)
+              .slice(0, 8)
               .map((event, index) => (
                 <View key={event.id} style={styles.timelineRow}>
                   <Text style={styles.timelineTime}>{formatTimelineTime(event.timestamp)}</Text>
                   <View style={styles.timelineRail}>
                     <View style={styles.timelineDot} />
-                    {index < Math.min(timeline.length, 6) - 1 ? (
+                    {index < Math.min(timeline.length, 8) - 1 ? (
                       <View style={styles.timelineLine} />
                     ) : null}
                   </View>
@@ -323,6 +342,12 @@ export default function OutingScreen() {
           <Text style={styles.finishButtonText}>TERMINAR SALIDA</Text>
         </Pressable>
       </ScrollView>
+
+      <VenuePickerSheet
+        visible={venuePickerOpen}
+        onClose={() => setVenuePickerOpen(false)}
+        onVenueChanged={(venue) => setNotice(`Ahora consta: ${venue.name}.`)}
+      />
 
       <Modal
         transparent
@@ -371,7 +396,8 @@ export default function OutingScreen() {
             <Text style={styles.finishTitle}>¿Damos esto por terminado?</Text>
             <Text style={styles.finishSummary}>
               {formatElapsed(elapsed)} · {formatDistance(activeOuting.distanceMeters)} · {drinks.length} bebida
-              {drinks.length === 1 ? '' : 's'} registrada{drinks.length === 1 ? '' : 's'}
+              {drinks.length === 1 ? '' : 's'} registrada{drinks.length === 1 ? '' : 's'} · {stops.length} garito
+              {stops.length === 1 ? '' : 's'}
             </Text>
 
             <Pressable
@@ -430,7 +456,7 @@ const styles = StyleSheet.create({
   liveText: { color: colors.accent, fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
   timer: { marginTop: 4, color: colors.text, fontSize: 36, fontWeight: '900', fontVariant: ['tabular-nums'] },
   venueBadge: {
-    maxWidth: 132,
+    maxWidth: 150,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -441,7 +467,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  venueBadgePressed: { borderColor: colors.accent },
   venueText: { flexShrink: 1, color: colors.textMuted, fontSize: 12, fontWeight: '700' },
+  venueTextActive: { color: colors.text },
   routeSection: { gap: 10 },
   routeHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 },
   routeEyebrow: { color: colors.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.35 },
@@ -460,6 +488,31 @@ const styles = StyleSheet.create({
   gpsBadgeText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
   routeMeta: { minHeight: 22, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
   routeMetaText: { color: colors.textMuted, fontSize: 10, fontWeight: '700' },
+  venueAction: {
+    minHeight: 78,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  venueActionPressed: { borderColor: colors.accent },
+  venueActionIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.surfaceRaised,
+  },
+  venueActionCopy: { flex: 1 },
+  venueActionEyebrow: { color: colors.accent, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  venueActionTitle: { marginTop: 2, color: colors.text, fontSize: 14, fontWeight: '900' },
+  venueActionText: { marginTop: 2, color: colors.textMuted, fontSize: 10, lineHeight: 14 },
+  venueActionButton: { color: colors.accent, fontSize: 9, fontWeight: '900' },
   gpsWarning: {
     flexDirection: 'row',
     alignItems: 'center',
