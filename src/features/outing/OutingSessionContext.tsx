@@ -34,6 +34,7 @@ type OutingSessionContextValue = {
   drinks: DrinkEntry[];
   routePoints: LocationPoint[];
   lastFinishedOuting: CompletedOuting | null;
+  showCompletionSummary: boolean;
   isHydrated: boolean;
   persistenceError: boolean;
   locationStatus: LocationTrackingStatus;
@@ -43,6 +44,7 @@ type OutingSessionContextValue = {
   undoLastDrink: () => DrinkEntry | null;
   finishOuting: () => CompletedOuting | null;
   clearLastFinishedOuting: () => void;
+  dismissCompletionSummary: () => void;
   retryLocationTracking: () => void;
 };
 
@@ -57,6 +59,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
   const [drinks, setDrinks] = useState<DrinkEntry[]>([]);
   const [routePoints, setRoutePoints] = useState<LocationPoint[]>([]);
   const [lastFinishedOuting, setLastFinishedOuting] = useState<CompletedOuting | null>(null);
+  const [showCompletionSummary, setShowCompletionSummary] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [persistenceError, setPersistenceError] = useState(false);
   const [locationStatus, setLocationStatus] = useState<LocationTrackingStatus>('idle');
@@ -189,6 +192,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       updatedAt: now,
     };
 
+    setShowCompletionSummary(false);
     setActiveOuting(outing);
     setDrinks([]);
     setRoutePoints([]);
@@ -257,13 +261,18 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
     };
 
     setLastFinishedOuting(snapshot);
+    setShowCompletionSummary(true);
     setActiveOuting(null);
     setDrinks([]);
     setRoutePoints([]);
     return snapshot;
   }, [activeOuting, drinks, routePoints]);
 
-  const clearLastFinishedOuting = useCallback(() => setLastFinishedOuting(null), []);
+  const clearLastFinishedOuting = useCallback(() => {
+    setShowCompletionSummary(false);
+    setLastFinishedOuting(null);
+  }, []);
+  const dismissCompletionSummary = useCallback(() => setShowCompletionSummary(false), []);
   const retryLocationTracking = useCallback(() => setLocationAttempt((value) => value + 1), []);
 
   const value = useMemo(
@@ -272,6 +281,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       drinks,
       routePoints,
       lastFinishedOuting,
+      showCompletionSummary,
       isHydrated,
       persistenceError,
       locationStatus,
@@ -281,6 +291,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       undoLastDrink,
       finishOuting,
       clearLastFinishedOuting,
+      dismissCompletionSummary,
       retryLocationTracking,
     }),
     [
@@ -288,6 +299,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       drinks,
       routePoints,
       lastFinishedOuting,
+      showCompletionSummary,
       isHydrated,
       persistenceError,
       locationStatus,
@@ -297,6 +309,7 @@ export function OutingSessionProvider({ children }: PropsWithChildren) {
       undoLastDrink,
       finishOuting,
       clearLastFinishedOuting,
+      dismissCompletionSummary,
       retryLocationTracking,
     ],
   );
