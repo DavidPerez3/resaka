@@ -4,7 +4,7 @@ import MapView, { Marker, Polyline } from 'react-native-maps';
 
 import { DrinkMapDetails } from '@/components/DrinkMapDetails';
 import {
-  buildDrinkClusterBadge,
+  buildDrinkClusterTokens,
   buildDrinkMapClusters,
   type DrinkMapCluster,
 } from '@/domain/drinkMap';
@@ -100,17 +100,22 @@ export function RouteMap({
             <Polyline coordinates={coordinates} strokeColor={colors.accent} strokeWidth={5} />
           ) : null}
 
-          {resolvedDrinkClusters.map((cluster) => (
-            <Marker
-              key={cluster.id}
-              coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
-              tracksViewChanges={false}
-            >
-              <View style={styles.drinkMarker}>
-                <Text style={styles.drinkMarkerText}>{buildDrinkClusterBadge(cluster)}</Text>
-              </View>
-            </Marker>
-          ))}
+          {resolvedDrinkClusters.map((cluster) => {
+            const tokens = buildDrinkClusterTokens(cluster);
+            return (
+              <Marker
+                key={cluster.id}
+                coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
+                tracksViewChanges={false}
+              >
+                <View style={styles.drinkMarker}>
+                  {tokens.map((token) => (
+                    <Text key={token} style={styles.drinkMarkerToken}>{token}</Text>
+                  ))}
+                </View>
+              </Marker>
+            );
+          })}
 
           <Marker coordinate={first} title="Inicio" pinColor={colors.success} />
           {coordinates.length > 1 ? (
@@ -151,20 +156,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   drinkMarker: {
-    minWidth: 34,
-    minHeight: 34,
-    paddingHorizontal: 7,
+    minHeight: 38,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 17,
-    backgroundColor: 'rgba(11,13,18,0.94)',
+    gap: 7,
+    borderRadius: 19,
+    backgroundColor: 'rgba(11,13,18,0.95)',
     borderWidth: 2,
     borderColor: colors.text,
   },
-  drinkMarkerText: {
+  drinkMarkerToken: {
+    minWidth: 26,
     color: colors.text,
-    fontSize: 14,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: '900',
+    textAlign: 'center',
   },
   legend: {
     position: 'absolute',
