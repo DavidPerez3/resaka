@@ -78,7 +78,7 @@ function RootTabs() {
             tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" color={color} size={size} />,
           }}
         />
-        <Tabs.Screen name="summary" options={{ href: null }} />
+        <Tabs.Screen name="summary" options={{ href: null, lazy: false }} />
       </Tabs>
     </View>
   );
