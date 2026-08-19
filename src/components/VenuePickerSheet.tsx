@@ -221,6 +221,8 @@ export function VenuePickerSheet({ visible, onClose, onVenueChanged }: VenuePick
                 <Text style={styles.manualButtonText}>GUARDAR Y ENTRAR</Text>
               </Pressable>
             </View>
+
+            <Text style={styles.attribution}>Datos de lugares: © OpenStreetMap contributors</Text>
           </ScrollView>
         </View>
       </View>
@@ -348,4 +350,10 @@ const styles = StyleSheet.create({
   },
   manualButtonPressed: { backgroundColor: colors.accentPressed },
   manualButtonText: { color: colors.text, fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+  attribution: {
+    marginTop: 4,
+    color: colors.textMuted,
+    fontSize: 9,
+    textAlign: 'center',
+  },
 });
