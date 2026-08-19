@@ -4,9 +4,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { RouteMap } from '@/components/RouteMap';
 import type { BeerSize, DrinkType } from '@/domain/drinks';
+import { formatDistance } from '@/domain/route';
 import { buildOutingTimeline, formatTimelineTime } from '@/domain/timeline';
-import { useOutingSession } from '@/features/outing/OutingSessionContext';
+import {
+  type LocationTrackingStatus,
+  useOutingSession,
+} from '@/features/outing/OutingSessionContext';
 import { colors } from '@/theme/colors';
 
 const BEER_OPTIONS: Array<{ size: BeerSize; label: string; hint: string }> = [
@@ -37,10 +42,30 @@ function getDrinkLabel(type: DrinkType, beerSize?: BeerSize) {
   return 'Copa';
 }
 
+function getLocationStatus(status: LocationTrackingStatus) {
+  if (status === 'tracking') {
+    return { label: 'GPS ACTIVO', icon: 'navigate' as const, color: colors.success };
+  }
+  if (status === 'requesting') {
+    return { label: 'BUSCANDO GPS', icon: 'locate-outline' as const, color: colors.warning };
+  }
+  if (status === 'denied') {
+    return { label: 'SIN PERMISO', icon: 'location-outline' as const, color: colors.warning };
+  }
+  if (status === 'error') {
+    return { label: 'ERROR GPS', icon: 'warning-outline' as const, color: colors.danger };
+  }
+  return { label: 'GPS EN ESPERA', icon: 'location-outline' as const, color: colors.textMuted };
+}
+
 export default function OutingScreen() {
   const {
     activeOuting,
     drinks,
+    routePoints,
+    locationStatus,
+    locationError,
+    retryLocationTracking,
     startOuting,
     addDrink,
     undoLastDrink,
@@ -123,7 +148,7 @@ export default function OutingScreen() {
           <Text style={styles.emptyEyebrow}>SIN SALIDA ACTIVA</Text>
           <Text style={styles.emptyTitle}>Todavía no consta nada.</Text>
           <Text style={styles.emptyText}>
-            Empieza una salida y podrás ir registrando la noche sin salir de esta pantalla.
+            Empieza una salida y RESAKA guardará bebidas, tiempo y recorrido. Al iniciar te pediremos permiso para usar el GPS.
           </Text>
           <Pressable
             style={({ pressed }) => [styles.startButton, pressed && styles.primaryPressed]}
@@ -140,6 +165,9 @@ export default function OutingScreen() {
       </SafeAreaView>
     );
   }
+
+  const locationUi = getLocationStatus(locationStatus);
+  const latestPoint = routePoints[routePoints.length - 1];
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -165,19 +193,48 @@ export default function OutingScreen() {
           </View>
         </View>
 
-        <View style={styles.mapCard}>
-          <View style={styles.mapPulse}>
-            <Ionicons name="navigate" color={colors.accent} size={28} />
+        <View style={styles.routeSection}>
+          <View style={styles.routeHeader}>
+            <View>
+              <Text style={styles.routeEyebrow}>RUTA EN DIRECTO</Text>
+              <Text style={styles.routeDistance}>{formatDistance(activeOuting.distanceMeters)}</Text>
+            </View>
+            <View style={styles.gpsBadge}>
+              <Ionicons name={locationUi.icon} color={locationUi.color} size={15} />
+              <Text style={[styles.gpsBadgeText, { color: locationUi.color }]}>{locationUi.label}</Text>
+            </View>
           </View>
-          <Text style={styles.mapTitle}>El mapa empieza en el Bloque 3.</Text>
-          <Text style={styles.mapText}>
-            De momento cerramos el registro de la noche. Después conectaremos GPS, distancia y recorrido real.
-          </Text>
-          <View style={styles.mapStats}>
-            <Text style={styles.mapStat}>0.0 km</Text>
-            <Text style={styles.mapDivider}>·</Text>
-            <Text style={styles.mapStat}>0 garitos</Text>
+
+          <RouteMap points={routePoints} height={220} />
+
+          <View style={styles.routeMeta}>
+            <Text style={styles.routeMetaText}>{routePoints.length} puntos guardados</Text>
+            {typeof latestPoint?.accuracy === 'number' ? (
+              <Text style={styles.routeMetaText}>precisión ±{Math.round(latestPoint.accuracy)} m</Text>
+            ) : null}
           </View>
+
+          {locationStatus === 'denied' || locationStatus === 'error' ? (
+            <View style={styles.gpsWarning}>
+              <View style={styles.gpsWarningCopy}>
+                <Text style={styles.gpsWarningTitle}>
+                  {locationStatus === 'denied' ? 'No tenemos permiso de ubicación.' : 'El GPS se ha torcido.'}
+                </Text>
+                <Text style={styles.gpsWarningText}>
+                  {locationStatus === 'denied'
+                    ? 'Puedes seguir registrando bebidas. Si cambias el permiso del navegador o del móvil, pulsa reintentar.'
+                    : locationError ?? 'Puedes seguir con la salida y probar de nuevo cuando quieras.'}
+                </Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [styles.retryButton, pressed && styles.retryButtonPressed]}
+                onPress={retryLocationTracking}
+                accessibilityRole="button"
+              >
+                <Text style={styles.retryButtonText}>REINTENTAR</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.noticeBar}>
@@ -304,8 +361,8 @@ export default function OutingScreen() {
             <Text style={styles.finishEyebrow}>FIN DE LA NOCHE</Text>
             <Text style={styles.finishTitle}>¿Damos esto por terminado?</Text>
             <Text style={styles.finishSummary}>
-              {formatElapsed(elapsed)} · {drinks.length} bebida{drinks.length === 1 ? '' : 's'} registrada
-              {drinks.length === 1 ? '' : 's'}
+              {formatElapsed(elapsed)} · {formatDistance(activeOuting.distanceMeters)} · {drinks.length} bebida
+              {drinks.length === 1 ? '' : 's'} registrada{drinks.length === 1 ? '' : 's'}
             </Text>
 
             <Pressable
@@ -355,49 +412,14 @@ function DrinkButton({ emoji, label, count, onPress }: DrinkButtonProps) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scroll: {
-    flex: 1,
-  },
-  container: {
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 112,
-    gap: 14,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  liveRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.accent,
-  },
-  liveText: {
-    color: colors.accent,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.4,
-  },
-  timer: {
-    marginTop: 4,
-    color: colors.text,
-    fontSize: 36,
-    fontWeight: '900',
-    fontVariant: ['tabular-nums'],
-  },
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  scroll: { flex: 1 },
+  container: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 112, gap: 14 },
+  topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },
+  liveText: { color: colors.accent, fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
+  timer: { marginTop: 4, color: colors.text, fontSize: 36, fontWeight: '900', fontVariant: ['tabular-nums'] },
   venueBadge: {
     maxWidth: 132,
     flexDirection: 'row',
@@ -410,56 +432,41 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  venueText: {
-    flexShrink: 1,
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  mapCard: {
-    minHeight: 160,
-    padding: 18,
-    justifyContent: 'center',
-    borderRadius: 24,
+  venueText: { flexShrink: 1, color: colors.textMuted, fontSize: 12, fontWeight: '700' },
+  routeSection: { gap: 10 },
+  routeHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 },
+  routeEyebrow: { color: colors.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.35 },
+  routeDistance: { marginTop: 2, color: colors.text, fontSize: 25, fontWeight: '900' },
+  gpsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    borderRadius: 13,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    overflow: 'hidden',
   },
-  mapPulse: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceRaised,
-  },
-  mapTitle: {
-    marginTop: 12,
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  mapText: {
-    marginTop: 5,
-    maxWidth: 360,
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  mapStats: {
-    marginTop: 14,
+  gpsBadgeText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+  routeMeta: { minHeight: 22, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
+  routeMetaText: { color: colors.textMuted, fontSize: 10, fontWeight: '700' },
+  gpsWarning: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    gap: 12,
+    padding: 13,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  mapStat: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  mapDivider: {
-    color: colors.textMuted,
-  },
+  gpsWarningCopy: { flex: 1 },
+  gpsWarningTitle: { color: colors.text, fontSize: 12, fontWeight: '900' },
+  gpsWarningText: { marginTop: 3, color: colors.textMuted, fontSize: 10, lineHeight: 15 },
+  retryButton: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, backgroundColor: colors.surface },
+  retryButtonPressed: { backgroundColor: colors.background },
+  retryButtonText: { color: colors.accent, fontSize: 9, fontWeight: '900' },
   noticeBar: {
     minHeight: 44,
     flexDirection: 'row',
@@ -470,22 +477,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.surfaceRaised,
   },
-  noticeText: {
-    flex: 1,
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  undoText: {
-    color: colors.accent,
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  drinkGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
+  noticeText: { flex: 1, color: colors.textMuted, fontSize: 12, fontWeight: '700' },
+  undoText: { color: colors.accent, fontSize: 11, fontWeight: '900' },
+  drinkGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   drinkButton: {
     width: '48%',
     minHeight: 116,
@@ -497,20 +491,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  drinkButtonPressed: {
-    backgroundColor: colors.surfaceRaised,
-    transform: [{ scale: 0.985 }],
-  },
-  drinkEmoji: {
-    fontSize: 30,
-  },
-  drinkLabel: {
-    marginTop: 8,
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-  },
+  drinkButtonPressed: { backgroundColor: colors.surfaceRaised, transform: [{ scale: 0.985 }] },
+  drinkEmoji: { fontSize: 30 },
+  drinkLabel: { marginTop: 8, color: colors.text, fontSize: 13, fontWeight: '900', letterSpacing: 0.6 },
   countBadge: {
     position: 'absolute',
     top: 10,
@@ -523,11 +506,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.surfaceRaised,
   },
-  countText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
-  },
+  countText: { color: colors.textMuted, fontSize: 12, fontWeight: '900' },
   timelineCard: {
     padding: 18,
     borderRadius: 22,
@@ -535,83 +514,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  sectionEyebrow: {
-    color: colors.accent,
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.3,
-  },
-  sectionTitle: {
-    marginTop: 3,
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  eventCount: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  timelineList: {
-    marginTop: 18,
-    gap: 0,
-  },
-  timelineRow: {
-    minHeight: 54,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  timelineTime: {
-    width: 46,
-    paddingTop: 2,
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
-  timelineRail: {
-    width: 16,
-    alignItems: 'center',
-    alignSelf: 'stretch',
-  },
-  timelineDot: {
-    width: 8,
-    height: 8,
-    marginTop: 4,
-    borderRadius: 4,
-    backgroundColor: colors.accent,
-  },
-  timelineLine: {
-    width: 1,
-    flex: 1,
-    marginTop: 3,
-    backgroundColor: colors.border,
-  },
-  timelineEmoji: {
-    width: 30,
-    marginLeft: 5,
-    fontSize: 18,
-  },
-  timelineCopy: {
-    flex: 1,
-    paddingBottom: 12,
-  },
-  timelineTitle: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  timelineDetail: {
-    marginTop: 2,
-    color: colors.textMuted,
-    fontSize: 11,
-  },
+  sectionHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 },
+  sectionEyebrow: { color: colors.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
+  sectionTitle: { marginTop: 3, color: colors.text, fontSize: 20, fontWeight: '900' },
+  eventCount: { color: colors.textMuted, fontSize: 11, fontWeight: '700' },
+  timelineList: { marginTop: 18, gap: 0 },
+  timelineRow: { minHeight: 54, flexDirection: 'row', alignItems: 'flex-start' },
+  timelineTime: { width: 46, paddingTop: 2, color: colors.textMuted, fontSize: 11, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  timelineRail: { width: 16, alignItems: 'center', alignSelf: 'stretch' },
+  timelineDot: { width: 8, height: 8, marginTop: 4, borderRadius: 4, backgroundColor: colors.accent },
+  timelineLine: { width: 1, flex: 1, marginTop: 3, backgroundColor: colors.border },
+  timelineEmoji: { width: 30, marginLeft: 5, fontSize: 18 },
+  timelineCopy: { flex: 1, paddingBottom: 12 },
+  timelineTitle: { color: colors.text, fontSize: 13, fontWeight: '800' },
+  timelineDetail: { marginTop: 2, color: colors.textMuted, fontSize: 11 },
   finishButton: {
     minHeight: 56,
     alignItems: 'center',
@@ -620,21 +536,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.accent,
   },
-  finishButtonPressed: {
-    backgroundColor: colors.surface,
-  },
-  finishButtonText: {
-    color: colors.accent,
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-  },
-  emptyState: {
-    flex: 1,
-    paddingHorizontal: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  finishButtonPressed: { backgroundColor: colors.surface },
+  finishButtonText: { color: colors.accent, fontSize: 13, fontWeight: '900', letterSpacing: 0.7 },
+  emptyState: { flex: 1, paddingHorizontal: 26, alignItems: 'center', justifyContent: 'center' },
   emptyIcon: {
     width: 68,
     height: 68,
@@ -643,28 +547,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.surfaceRaised,
   },
-  emptyEyebrow: {
-    marginTop: 22,
-    color: colors.accent,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.4,
-  },
-  emptyTitle: {
-    marginTop: 8,
-    color: colors.text,
-    fontSize: 27,
-    textAlign: 'center',
-    fontWeight: '900',
-  },
-  emptyText: {
-    marginTop: 10,
-    maxWidth: 360,
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: 'center',
-  },
+  emptyEyebrow: { marginTop: 22, color: colors.accent, fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
+  emptyTitle: { marginTop: 8, color: colors.text, fontSize: 27, textAlign: 'center', fontWeight: '900' },
+  emptyText: { marginTop: 10, maxWidth: 360, color: colors.textMuted, fontSize: 14, lineHeight: 21, textAlign: 'center' },
   startButton: {
     minHeight: 56,
     marginTop: 24,
@@ -676,20 +561,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: colors.accent,
   },
-  startButtonText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-  },
-  primaryPressed: {
-    backgroundColor: colors.accentPressed,
-  },
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.68)',
-  },
+  startButtonText: { color: colors.text, fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
+  primaryPressed: { backgroundColor: colors.accentPressed },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.68)' },
   sheet: {
     paddingHorizontal: 20,
     paddingTop: 10,
@@ -700,36 +574,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  sheetHandle: {
-    width: 42,
-    height: 5,
-    alignSelf: 'center',
-    borderRadius: 3,
-    backgroundColor: colors.border,
-  },
-  sheetEyebrow: {
-    marginTop: 22,
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1.4,
-  },
-  sheetTitle: {
-    marginTop: 5,
-    color: colors.text,
-    fontSize: 26,
-    fontWeight: '900',
-  },
-  sheetText: {
-    marginTop: 7,
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  beerOptions: {
-    marginTop: 18,
-    gap: 10,
-  },
+  sheetHandle: { width: 42, height: 5, alignSelf: 'center', borderRadius: 3, backgroundColor: colors.border },
+  sheetEyebrow: { marginTop: 22, color: colors.accent, fontSize: 12, fontWeight: '900', letterSpacing: 1.4 },
+  sheetTitle: { marginTop: 5, color: colors.text, fontSize: 26, fontWeight: '900' },
+  sheetText: { marginTop: 7, color: colors.textMuted, fontSize: 13, lineHeight: 19 },
+  beerOptions: { marginTop: 18, gap: 10 },
   beerOption: {
     minHeight: 68,
     paddingHorizontal: 16,
@@ -741,19 +590,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  beerOptionPressed: {
-    borderColor: colors.accent,
-  },
-  beerOptionText: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  beerOptionHint: {
-    marginTop: 2,
-    color: colors.textMuted,
-    fontSize: 11,
-  },
+  beerOptionPressed: { borderColor: colors.accent },
+  beerOptionText: { color: colors.text, fontSize: 16, fontWeight: '900' },
+  beerOptionHint: { marginTop: 2, color: colors.textMuted, fontSize: 11 },
   finishBackdrop: {
     flex: 1,
     padding: 22,
@@ -770,25 +609,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  finishEyebrow: {
-    color: colors.accent,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.4,
-  },
-  finishTitle: {
-    marginTop: 7,
-    color: colors.text,
-    fontSize: 25,
-    lineHeight: 30,
-    fontWeight: '900',
-  },
-  finishSummary: {
-    marginTop: 10,
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 19,
-  },
+  finishEyebrow: { color: colors.accent, fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
+  finishTitle: { marginTop: 7, color: colors.text, fontSize: 25, lineHeight: 30, fontWeight: '900' },
+  finishSummary: { marginTop: 10, color: colors.textMuted, fontSize: 13, lineHeight: 19 },
   confirmFinish: {
     minHeight: 54,
     marginTop: 22,
@@ -797,21 +620,7 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     backgroundColor: colors.accent,
   },
-  confirmFinishText: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  continueButton: {
-    minHeight: 48,
-    marginTop: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  continueButtonText: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  confirmFinishText: { color: colors.text, fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
+  continueButton: { minHeight: 48, marginTop: 8, alignItems: 'center', justifyContent: 'center' },
+  continueButtonText: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
 });
