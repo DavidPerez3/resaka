@@ -78,7 +78,7 @@ function buildMapHtml(
       (drinks.length > 0 ? '<div class="legend-item"><span>🍺</span><span>Consumición</span></div>' : '');
 
     const map = L.map('map', { zoomControl: false, attributionControl: true });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
