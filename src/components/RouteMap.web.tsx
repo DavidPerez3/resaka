@@ -68,7 +68,7 @@ function buildMapHtml(points: LocationPoint[], endLabel: string) {
 </html>`;
 }
 
-export function RouteMap({ points, height = 220, endLabel = 'Ahora' }: RouteMapProps) {
+export function RouteMap({ points, height = 220, endLabel = 'Última posición' }: RouteMapProps) {
   const srcDoc = useMemo(() => buildMapHtml(points, endLabel), [endLabel, points]);
 
   if (points.length === 0) {
