@@ -56,7 +56,7 @@ export function RouteMap({ points, height = 220 }: RouteMapProps) {
   const last = coordinates[coordinates.length - 1];
 
   return (
-    <View style={[styles.frame, { height }]}>
+    <View style={[styles.frame, { height }]} pointerEvents="none">
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
@@ -66,8 +66,12 @@ export function RouteMap({ points, height = 220 }: RouteMapProps) {
           longitudeDelta: 0.006,
         }}
         showsUserLocation
-        showsMyLocationButton
+        showsMyLocationButton={false}
         toolbarEnabled={false}
+        scrollEnabled={false}
+        zoomEnabled={false}
+        rotateEnabled={false}
+        pitchEnabled={false}
       >
         {coordinates.length > 1 ? (
           <Polyline coordinates={coordinates} strokeColor={colors.accent} strokeWidth={5} />
