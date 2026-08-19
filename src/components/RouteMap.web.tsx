@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { DrinkMapDetails } from '@/components/DrinkMapDetails';
 import {
-  buildDrinkClusterBadge,
+  buildDrinkClusterTokens,
   buildDrinkMapClusters,
   type DrinkMapCluster,
 } from '@/domain/drinkMap';
@@ -27,7 +27,7 @@ function buildMapHtml(points: LocationPoint[], drinkClusters: DrinkMapCluster[],
   const drinkMarkers = drinkClusters.map((cluster) => ({
     latitude: cluster.latitude,
     longitude: cluster.longitude,
-    badge: buildDrinkClusterBadge(cluster),
+    tokens: buildDrinkClusterTokens(cluster),
   }));
   const safeCoordinates = escapeJsonForHtml(coordinates);
   const safeDrinkMarkers = escapeJsonForHtml(drinkMarkers);
@@ -49,7 +49,8 @@ function buildMapHtml(points: LocationPoint[], drinkClusters: DrinkMapCluster[],
     .dot{width:9px;height:9px;border-radius:50%}
     .start{background:#4CAF78}
     .end{background:#E84A5F}
-    .drink-marker{display:flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 6px;border-radius:16px;background:rgba(11,13,18,.94);border:2px solid #F7F2E8;color:#F7F2E8;font:900 14px system-ui,-apple-system,sans-serif;box-shadow:0 3px 10px rgba(0,0,0,.28);white-space:nowrap}
+    .drink-marker{box-sizing:border-box;height:38px;display:flex;align-items:center;justify-content:center;gap:7px;padding:0 10px;border-radius:19px;background:rgba(11,13,18,.95);border:2px solid #F7F2E8;color:#F7F2E8;box-shadow:0 3px 10px rgba(0,0,0,.28);white-space:nowrap;overflow:hidden}
+    .drink-token{display:inline-flex;align-items:center;justify-content:center;min-width:26px;font:900 15px/1 system-ui,-apple-system,sans-serif;white-space:nowrap}
   </style>
 </head>
 <body>
@@ -82,12 +83,16 @@ function buildMapHtml(points: LocationPoint[], drinkClusters: DrinkMapCluster[],
     }
 
     drinks.forEach((drink) => {
-      const width = Math.max(34, 18 + Array.from(drink.badge).length * 8);
+      const tokenCount = Math.max(1, drink.tokens.length);
+      const width = Math.min(190, 20 + tokenCount * 38);
+      const tokenHtml = drink.tokens
+        .map((token) => '<span class="drink-token">' + token + '</span>')
+        .join('');
       const icon = L.divIcon({
         className: '',
-        html: '<div class="drink-marker">' + drink.badge + '</div>',
-        iconSize: [width, 34],
-        iconAnchor: [width / 2, 17]
+        html: '<div class="drink-marker" style="width:' + width + 'px">' + tokenHtml + '</div>',
+        iconSize: [width, 38],
+        iconAnchor: [width / 2, 19]
       });
       L.marker([drink.latitude, drink.longitude], { icon, interactive: false }).addTo(map);
     });
