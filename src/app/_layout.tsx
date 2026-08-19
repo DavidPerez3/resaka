@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, Tabs, usePathname } from 'expo-router';
+import { router, Tabs, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -27,25 +27,30 @@ function RootTabs() {
     isHydrated,
     persistenceError,
   } = useOutingSession();
-  const pathname = usePathname();
+  const segments = useSegments();
+  const currentRoute = segments[segments.length - 1];
 
   useEffect(() => {
     if (!isHydrated || !showCompletionSummary) return;
 
-    if (!activeOuting && lastFinishedOuting && pathname === '/outing') {
+    // useSegments() devuelve las rutas de Expo Router y no incluye el baseUrl
+    // físico de GitHub Pages (/resaka). Así este fallback funciona igual en
+    // web, Android e iOS.
+    if (!activeOuting && lastFinishedOuting && currentRoute === 'outing') {
       router.replace('/summary');
       return;
     }
 
-    if (pathname === '/') {
+    if (segments.length === 0 || currentRoute === 'index') {
       dismissCompletionSummary();
     }
   }, [
     activeOuting,
+    currentRoute,
     dismissCompletionSummary,
     isHydrated,
     lastFinishedOuting,
-    pathname,
+    segments.length,
     showCompletionSummary,
   ]);
 
