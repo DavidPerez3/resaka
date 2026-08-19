@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "RESAKA",
+    "slug": "resaka",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "resaka",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.davidperez3.resaka"
+    },
+    "android": {
+      "package": "com.davidperez3.resaka",
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "bundler": "metro"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
