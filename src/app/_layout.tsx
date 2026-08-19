@@ -33,14 +33,13 @@ function RootTabs() {
   useEffect(() => {
     if (!isHydrated || !showCompletionSummary) return;
 
-    if (segments.length === 0 || currentRoute === 'index') {
+    if (currentRoute === 'index') {
       dismissCompletionSummary();
     }
   }, [
     currentRoute,
     dismissCompletionSummary,
     isHydrated,
-    segments.length,
     showCompletionSummary,
   ]);
 
@@ -54,11 +53,8 @@ function RootTabs() {
     );
   }
 
-  // Este redirect es deliberadamente síncrono. Al terminar una salida,
-  // activeOuting pasa a null en el mismo commit de React en el que queda
-  // disponible lastFinishedOuting. Devolver Redirect aquí evita que llegue
-  // a renderizarse durante un frame la pantalla vacía de /outing y funciona
-  // igual con el baseUrl /resaka de GitHub Pages.
+  // Redirect síncrono: al terminar una salida evitamos que /outing llegue
+  // a renderizarse sin activeOuting antes de abrir el resumen.
   if (
     showCompletionSummary &&
     !activeOuting &&
