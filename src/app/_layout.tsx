@@ -1,10 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs, usePathname } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import SummaryScreen from '@/app/summary';
 import { OutingSessionProvider, useOutingSession } from '@/features/outing/OutingSessionContext';
 import { colors } from '@/theme/colors';
 
@@ -20,21 +18,7 @@ function StorageWarning({ visible }: { visible: boolean }) {
 }
 
 function RootTabs() {
-  const {
-    activeOuting,
-    lastFinishedOuting,
-    showCompletionSummary,
-    dismissCompletionSummary,
-    isHydrated,
-    persistenceError,
-  } = useOutingSession();
-  const pathname = usePathname();
-
-  useEffect(() => {
-    if (showCompletionSummary && pathname === '/') {
-      dismissCompletionSummary();
-    }
-  }, [dismissCompletionSummary, pathname, showCompletionSummary]);
+  const { activeOuting, isHydrated, persistenceError } = useOutingSession();
 
   if (!isHydrated) {
     return (
@@ -42,17 +26,6 @@ function RootTabs() {
         <ActivityIndicator color={colors.accent} size="large" />
         <Text style={styles.loadingTitle}>RECUPERANDO LA NOCHE</Text>
         <Text style={styles.loadingText}>Un segundo, estamos buscando las pruebas.</Text>
-      </View>
-    );
-  }
-
-  // Al terminar una salida mostramos el resumen directamente sobre el shell de la app.
-  // Así GitHub Pages no depende de una transición SPA a una ruta oculta de Tabs.
-  if (showCompletionSummary && lastFinishedOuting && pathname !== '/') {
-    return (
-      <View style={styles.appShell}>
-        <StorageWarning visible={persistenceError} />
-        <SummaryScreen />
       </View>
     );
   }
