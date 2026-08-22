@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { type ComponentProps, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -157,7 +157,7 @@ export function ShareOutingModal({ visible, completed, onClose }: ShareOutingMod
 }
 
 type ShareToggleProps = {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: ComponentProps<typeof Ionicons>['name'];
   label: string;
   enabled: boolean;
   onPress: () => void;
