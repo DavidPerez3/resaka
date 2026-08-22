@@ -23,7 +23,8 @@ src/
 - Solo la cerveza tiene tamaño: quinto, tercio o litrona.
 - GPS y almacenamiento se consumen mediante interfaces para poder cambiar implementaciones sin tocar el dominio.
 - Los garitos se obtienen desde proveedores reales; no se mantienen listas mockeadas dentro de la app.
-- Primero funcionalidad local; Supabase se integra cuando el flujo principal esté estable.
+- El flujo principal conserva persistencia local aunque exista backend, para mantener uso offline y no bloquear el registro de una salida.
+- Supabase usa RLS y una publishable key en cliente; secretos y service-role keys nunca viven en la app.
 - La preview web se publica desde `main` mediante GitHub Actions y Expo Web.
 
 ## Bloque 0 — Base técnica y despliegue
@@ -37,6 +38,8 @@ src/
 - [x] Workflow de build/deploy para GitHub Pages
 - [x] GitHub Pages habilitado con Source = GitHub Actions
 - [x] Export web configurado como SPA para GitHub Pages
+
+> Estado: **COMPLETADO**.
 
 ## Bloque 1 — Núcleo de una salida
 
@@ -77,7 +80,7 @@ src/
 - [x] Estado visual mientras se recuperan los datos
 - [x] Aviso si falla el almacenamiento local
 
-> Estado: **COMPLETADO**. El almacenamiento actual es local al dispositivo/navegador. La sincronización entre dispositivos llegará con Supabase en el Bloque 5.
+> Estado: **COMPLETADO**. AsyncStorage sigue siendo la capa local/offline aunque exista sincronización con Supabase.
 
 ## Bloque 3 — GPS y recorrido
 
@@ -135,12 +138,27 @@ src/
 
 ## Bloque 5 — Backend y cuentas
 
-- [ ] Supabase
-- [ ] Auth
-- [ ] Perfiles
-- [ ] Persistencia servidor
-- [ ] Sincronización local ↔ Supabase
-- [ ] RLS
+- [x] Proyecto Supabase independiente para RESAKA
+- [x] Esquema servidor para perfiles, salidas, garitos, paradas, consumiciones y route points
+- [x] Migraciones Supabase versionadas en GitHub
+- [x] Cliente Supabase tipado con publishable key
+- [x] Auth con email + contraseña
+- [x] Creación automática de perfil desde `auth.users`
+- [x] Pantalla de cuenta integrada en Perfil
+- [x] Edición de nombre y alias único
+- [x] Persistencia de sesión de Auth
+- [x] Cerrar sesión
+- [x] Google OAuth implementado en cliente web y callback/deep link nativo
+- [ ] Credenciales Google Cloud + activación del provider Google en Supabase
+- [ ] Validación real de Google OAuth en web y development build Android
+- [x] Persistencia servidor de salidas terminadas
+- [x] Sincronización local → Supabase de garitos, paradas, bebidas y recorrido
+- [x] La app sigue funcionando como invitado/offline sin cuenta
+- [x] RLS en todas las tablas de usuario
+- [x] Auditoría Supabase sin avisos de seguridad
+- [x] Índices para claves foráneas y consultas principales
+
+> Estado: **IMPLEMENTADO, pendiente de validación externa de Google OAuth**. El código y el backend están preparados; para activar Google faltan el Client ID/Secret de Google Cloud y registrar los redirects. La lectura de historial completo desde nube se implementa en el siguiente bloque de Perfil e Historial.
 
 ## Bloques posteriores
 
