@@ -149,8 +149,9 @@ src/
 - [x] Persistencia de sesión de Auth
 - [x] Cerrar sesión
 - [x] Google OAuth implementado en cliente web y callback/deep link nativo
-- [ ] Credenciales Google Cloud + activación del provider Google en Supabase
-- [ ] Validación real de Google OAuth en web y development build Android
+- [x] Credenciales Google Cloud + activación del provider Google en Supabase
+- [x] Validación real de Google OAuth en web
+- [ ] Validación Google OAuth en development build Android
 - [x] Persistencia servidor de salidas terminadas
 - [x] Sincronización local → Supabase de garitos, paradas, bebidas y recorrido
 - [x] La app sigue funcionando como invitado/offline sin cuenta
@@ -158,11 +159,24 @@ src/
 - [x] Auditoría Supabase sin avisos de seguridad
 - [x] Índices para claves foráneas y consultas principales
 
-> Estado: **IMPLEMENTADO, pendiente de validación externa de Google OAuth**. El código y el backend están preparados; para activar Google faltan el Client ID/Secret de Google Cloud y registrar los redirects. La lectura de historial completo desde nube se implementa en el siguiente bloque de Perfil e Historial.
+> Estado: **COMPLETADO para web**. Google OAuth funciona en la preview web. La validación nativa de Google se hará junto con la development build Android. La lectura de historial completo desde nube se implementa en el siguiente bloque de Perfil e Historial.
 
 ## Bloques posteriores
 
 - [ ] Perfil e historial
+- [ ] Compartir salida en redes
+  - [ ] Botón `Compartir` desde resumen e historial
+  - [ ] Generar una imagen/tarjeta de la salida con branding RESAKA
+  - [ ] Plantilla vertical 9:16 para Stories/TikTok/WhatsApp
+  - [ ] Plantilla 4:5 o cuadrada para publicaciones
+  - [ ] Mostrar datos seleccionables: duración, distancia, bebidas, garitos y fecha
+  - [ ] Mostrar la ruta como elemento visual principal al estilo Strava
+  - [ ] Permitir elegir una foto del usuario como fondo y superponer los datos de RESAKA
+  - [ ] Alternativa sin foto con mapa/fondo oscuro de RESAKA
+  - [ ] Previsualización antes de compartir
+  - [ ] Controles de privacidad para ocultar ruta, inicio/final, garitos o consumiciones
+  - [ ] Compartir mediante Share Sheet nativo en Android/iOS
+  - [ ] Web Share API cuando esté disponible y descarga de imagen como fallback web
 - [ ] Prestigio de Barra y rangos
 - [ ] Logros y récords
 - [ ] Currículum Etílico
