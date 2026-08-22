@@ -123,6 +123,7 @@ function RootTabs() {
         />
         <Tabs.Screen name="summary" options={{ href: null, lazy: false }} />
         <Tabs.Screen name="auth-callback" options={{ href: null }} />
+        <Tabs.Screen name="+not-found" options={{ href: null }} />
       </Tabs>
     </View>
   );
