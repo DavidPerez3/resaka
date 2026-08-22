@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Tabs, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ShareOutingModal } from '@/components/ShareOutingModal';
 import { AuthProvider } from '@/features/auth/AuthContext';
 import { OutingSessionProvider, useOutingSession } from '@/features/outing/OutingSessionContext';
 import { CloudSyncBridge } from '@/features/sync/CloudSyncBridge';
@@ -28,6 +30,10 @@ function RootTabs() {
     isHydrated,
     persistenceError,
   } = useOutingSession();
+  const segments = useSegments();
+  const insets = useSafeAreaInsets();
+  const [shareOpen, setShareOpen] = useState(false);
+  const currentRoute = segments[segments.length - 1];
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
@@ -54,6 +60,10 @@ function RootTabs() {
       window.location.replace('/resaka/summary');
     }
   }, [activeOuting, isHydrated, lastFinishedOuting, showCompletionSummary]);
+
+  useEffect(() => {
+    if (currentRoute !== 'summary') setShareOpen(false);
+  }, [currentRoute]);
 
   if (!isHydrated) {
     return (
@@ -125,6 +135,29 @@ function RootTabs() {
         <Tabs.Screen name="auth-callback" options={{ href: null }} />
         <Tabs.Screen name="+not-found" options={{ href: null }} />
       </Tabs>
+
+      {currentRoute === 'summary' && lastFinishedOuting ? (
+        <>
+          <Pressable
+            style={({ pressed }) => [
+              styles.shareFloating,
+              { top: insets.top + 13 },
+              pressed && styles.shareFloatingPressed,
+            ]}
+            onPress={() => setShareOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Compartir salida"
+          >
+            <Ionicons name="share-social" color={colors.text} size={21} />
+          </Pressable>
+
+          <ShareOutingModal
+            visible={shareOpen}
+            completed={lastFinishedOuting}
+            onClose={() => setShareOpen(false)}
+          />
+        </>
+      ) : null}
     </View>
   );
 }
@@ -209,6 +242,22 @@ const styles = StyleSheet.create({
     borderColor: colors.background,
   },
   recordButtonFocused: {
+    backgroundColor: colors.accentPressed,
+  },
+  shareFloating: {
+    position: 'absolute',
+    right: 20,
+    zIndex: 50,
+    width: 44,
+    height: 44,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accent,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  shareFloatingPressed: {
     backgroundColor: colors.accentPressed,
   },
 });
