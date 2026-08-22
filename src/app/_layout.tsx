@@ -115,6 +115,7 @@ function RootTabs() {
           }}
         />
         <Tabs.Screen name="summary" options={{ href: null, lazy: false }} />
+        <Tabs.Screen name="auth-callback" options={{ href: null }} />
       </Tabs>
     </View>
   );
