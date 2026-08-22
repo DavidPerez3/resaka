@@ -9,7 +9,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 
@@ -62,7 +62,7 @@ function getWebRedirectUrl() {
   return `${window.location.origin}/resaka/profile`;
 }
 
-function extractNativeOAuthSession(url: string) {
+function extractOAuthSession(url: string) {
   const parsed = new URL(url);
   const hash = new URLSearchParams(parsed.hash.replace(/^#/, ''));
   const query = parsed.searchParams;
@@ -72,6 +72,28 @@ function extractNativeOAuthSession(url: string) {
     refreshToken: hash.get('refresh_token'),
     code: query.get('code') ?? hash.get('code'),
   };
+}
+
+async function consumeAuthCallbackUrl(url: string) {
+  if (!url.startsWith('resaka://')) return false;
+
+  const oauth = extractOAuthSession(url);
+  if (oauth.accessToken && oauth.refreshToken) {
+    const { error } = await supabase.auth.setSession({
+      access_token: oauth.accessToken,
+      refresh_token: oauth.refreshToken,
+    });
+    if (error) throw error;
+    return true;
+  }
+
+  if (oauth.code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(oauth.code);
+    if (error) throw error;
+    return true;
+  }
+
+  return false;
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -101,6 +123,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     const initialize = async () => {
       try {
+        if (Platform.OS !== 'web') {
+          const initialUrl = await Linking.getInitialURL();
+          if (initialUrl) await consumeAuthCallbackUrl(initialUrl);
+        }
+
         const {
           data: { session: initialSession },
         } = await supabase.auth.getSession();
@@ -110,6 +137,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
         if (initialSession?.user.id) {
           await loadProfile(initialSession.user.id);
         }
+      } catch (error) {
+        console.warn('RESAKA auth initialization failed', error);
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -117,20 +146,27 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     void initialize();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const authSubscription = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       if (nextSession?.user.id) {
         void loadProfile(nextSession.user.id).catch(() => setProfile(null));
       } else {
         setProfile(null);
       }
-    });
+    }).data.subscription;
+
+    const linkSubscription = Platform.OS === 'web'
+      ? null
+      : Linking.addEventListener('url', ({ url }) => {
+          void consumeAuthCallbackUrl(url).catch((error) => {
+            console.warn('RESAKA auth callback failed', error);
+          });
+        });
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      authSubscription.unsubscribe();
+      linkSubscription?.remove();
     };
   }, [loadProfile]);
 
@@ -144,7 +180,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const signUpWithEmail = useCallback(
     async (email: string, password: string, fullName?: string) => {
-      const redirectTo = Platform.OS === 'web' ? getWebRedirectUrl() : 'resaka://auth/callback';
+      const redirectTo = Platform.OS === 'web' ? getWebRedirectUrl() : 'resaka://auth-callback';
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -172,7 +208,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    const redirectTo = 'resaka://google-auth';
+    const redirectTo = 'resaka://auth-callback';
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -189,24 +225,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     });
 
     if (result.type !== 'success') return;
-
-    const oauth = extractNativeOAuthSession(result.url);
-    if (oauth.accessToken && oauth.refreshToken) {
-      const { error: setSessionError } = await supabase.auth.setSession({
-        access_token: oauth.accessToken,
-        refresh_token: oauth.refreshToken,
-      });
-      if (setSessionError) throw setSessionError;
-      return;
-    }
-
-    if (oauth.code) {
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(oauth.code);
-      if (exchangeError) throw exchangeError;
-      return;
-    }
-
-    throw new Error('Google ha vuelto a RESAKA sin una sesión válida.');
+    const consumed = await consumeAuthCallbackUrl(result.url);
+    if (!consumed) throw new Error('Google ha vuelto a RESAKA sin una sesión válida.');
   }, []);
 
   const signOut = useCallback(async () => {
