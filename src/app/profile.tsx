@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +13,8 @@ import {
 
 import { useAuth } from '@/features/auth/AuthContext';
 import { colors } from '@/theme/colors';
+
+const GOOGLE_G_LOGO = 'https://developers.google.com/static/identity/images/g-logo.png';
 
 function friendlyAuthError(error: unknown) {
   const message = error instanceof Error ? error.message : 'Ha ocurrido un error con la cuenta.';
@@ -152,12 +155,14 @@ export default function ProfileScreen() {
           </View>
 
           <Pressable
-            style={({ pressed }) => [styles.googleButton, pressed && styles.buttonPressed, busy && styles.disabled]}
+            accessibilityRole="button"
+            accessibilityLabel="Continuar con Google"
+            style={({ pressed }) => [styles.googleButton, pressed && styles.googleButtonPressed, busy && styles.disabled]}
             disabled={busy}
             onPress={() => run(signInWithGoogle)}
           >
-            <Ionicons name="logo-google" size={19} color={colors.text} />
-            <Text style={styles.googleButtonText}>CONTINUAR CON GOOGLE</Text>
+            <Image source={{ uri: GOOGLE_G_LOGO }} style={styles.googleLogo} resizeMode="contain" />
+            <Text style={styles.googleButtonText}>Continuar con Google</Text>
           </Pressable>
 
           {busy ? <ActivityIndicator style={styles.busy} color={colors.accent} /> : null}
@@ -265,8 +270,10 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: colors.text, fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
   secondaryButton: { minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   secondaryButtonText: { color: colors.accent, fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
-  googleButton: { minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
-  googleButtonText: { color: colors.text, fontSize: 13, fontWeight: '900', letterSpacing: 0.6 },
+  googleButton: { minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: '#747775', backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 12 },
+  googleButtonPressed: { backgroundColor: '#F7F8F8' },
+  googleLogo: { width: 20, height: 20 },
+  googleButtonText: { color: '#1F1F1F', fontSize: 14, fontWeight: '700' },
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 5 },
   divider: { height: 1, flex: 1, backgroundColor: colors.border },
   dividerText: { color: colors.textMuted, fontSize: 11, fontWeight: '800' },
