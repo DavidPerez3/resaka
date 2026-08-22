@@ -70,7 +70,7 @@ export default function SummaryScreen() {
           <Ionicons name="document-text-outline" color={colors.textMuted} size={40} />
           <Text style={styles.emptyTitle}>No hay resumen que enseñar.</Text>
           <Text style={styles.emptyText}>Termina una salida y aparecerá aquí todo lo que consta en acta.</Text>
-          <Pressable style={styles.primaryButton} onPress={() => router.replace('/')} accessibilityRole="button">
+          <Pressable style={styles.primaryButton} onPress={() => router.replace('/home')} accessibilityRole="button">
             <Text style={styles.primaryButtonText}>VOLVER AL INICIO</Text>
           </Pressable>
         </View>
@@ -88,7 +88,7 @@ export default function SummaryScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Pressable style={styles.closeButton} onPress={() => router.replace('/')} accessibilityRole="button">
+          <Pressable style={styles.closeButton} onPress={() => router.replace('/home')} accessibilityRole="button">
             <Ionicons name="close" color={colors.text} size={23} />
           </Pressable>
           <View style={styles.headerCopy}>
@@ -222,7 +222,7 @@ export default function SummaryScreen() {
 
         <Pressable
           style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
-          onPress={() => router.replace('/')}
+          onPress={() => router.replace('/home')}
           accessibilityRole="button"
         >
           <Text style={styles.primaryButtonText}>VOLVER AL INICIO</Text>
@@ -233,7 +233,7 @@ export default function SummaryScreen() {
           onPress={() => {
             clearLastFinishedOuting();
             startOuting();
-            router.replace('/outing');
+            router.replace('/');
           }}
           accessibilityRole="button"
         >
