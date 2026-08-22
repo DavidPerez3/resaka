@@ -27,6 +27,12 @@
         {
           "locationWhenInUsePermission": "RESAKA usa tu ubicación mientras una salida está activa para dibujar el recorrido de la noche."
         }
+      ],
+      [
+        "expo-web-browser",
+        {
+          "experimentalLauncherActivity": false
+        }
       ]
     ],
     "experiments": {
