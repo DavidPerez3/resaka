@@ -101,22 +101,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadProfile = useCallback(async (userId?: string) => {
-    const id = userId ?? session?.user.id;
-    if (!id) {
-      setProfile(null);
-      return;
-    }
-
+  const loadProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
       .select('id, username, full_name, avatar_url, created_at, updated_at')
-      .eq('id', id)
+      .eq('id', userId)
       .single();
 
     if (error) throw error;
     setProfile(mapProfile(data));
-  }, [session?.user.id]);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -239,7 +233,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       const userId = session?.user.id;
       if (!userId) throw new Error('Necesitas iniciar sesión para editar el perfil.');
 
-      const updates: Record<string, string | null> = {};
+      const updates: { username?: string | null; full_name?: string | null } = {};
       if (username !== undefined) updates.username = username?.trim() || null;
       if (fullName !== undefined) updates.full_name = fullName?.trim() || null;
 
@@ -251,8 +245,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
   );
 
   const refreshProfile = useCallback(async () => {
-    await loadProfile();
-  }, [loadProfile]);
+    const userId = session?.user.id;
+    if (!userId) {
+      setProfile(null);
+      return;
+    }
+    await loadProfile(userId);
+  }, [loadProfile, session?.user.id]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
