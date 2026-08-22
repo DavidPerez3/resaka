@@ -4,7 +4,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
+import { AuthProvider } from '@/features/auth/AuthContext';
 import { OutingSessionProvider, useOutingSession } from '@/features/outing/OutingSessionContext';
+import { CloudSyncBridge } from '@/features/sync/CloudSyncBridge';
 import { colors } from '@/theme/colors';
 
 function StorageWarning({ visible }: { visible: boolean }) {
@@ -36,12 +38,7 @@ function RootTabs() {
     if (currentRoute === 'index') {
       dismissCompletionSummary();
     }
-  }, [
-    currentRoute,
-    dismissCompletionSummary,
-    isHydrated,
-    showCompletionSummary,
-  ]);
+  }, [currentRoute, dismissCompletionSummary, isHydrated, showCompletionSummary]);
 
   if (!isHydrated) {
     return (
@@ -53,8 +50,6 @@ function RootTabs() {
     );
   }
 
-  // Redirect síncrono: al terminar una salida evitamos que /outing llegue
-  // a renderizarse sin activeOuting antes de abrir el resumen.
   if (
     showCompletionSummary &&
     !activeOuting &&
@@ -66,6 +61,7 @@ function RootTabs() {
 
   return (
     <View style={styles.appShell}>
+      <CloudSyncBridge />
       <StorageWarning visible={persistenceError} />
 
       <Tabs
@@ -126,10 +122,12 @@ function RootTabs() {
 
 export default function RootLayout() {
   return (
-    <OutingSessionProvider>
-      <StatusBar style="light" />
-      <RootTabs />
-    </OutingSessionProvider>
+    <AuthProvider>
+      <OutingSessionProvider>
+        <StatusBar style="light" />
+        <RootTabs />
+      </OutingSessionProvider>
+    </AuthProvider>
   );
 }
 
