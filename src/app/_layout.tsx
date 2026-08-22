@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Redirect, Tabs, useSegments } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { AuthProvider } from '@/features/auth/AuthContext';
@@ -21,24 +20,7 @@ function StorageWarning({ visible }: { visible: boolean }) {
 }
 
 function RootTabs() {
-  const {
-    activeOuting,
-    lastFinishedOuting,
-    showCompletionSummary,
-    dismissCompletionSummary,
-    isHydrated,
-    persistenceError,
-  } = useOutingSession();
-  const segments = useSegments();
-  const currentRoute = segments[segments.length - 1];
-
-  useEffect(() => {
-    if (!isHydrated || !showCompletionSummary) return;
-
-    if (currentRoute === 'index') {
-      dismissCompletionSummary();
-    }
-  }, [currentRoute, dismissCompletionSummary, isHydrated, showCompletionSummary]);
+  const { activeOuting, isHydrated, persistenceError } = useOutingSession();
 
   if (!isHydrated) {
     return (
@@ -50,21 +32,13 @@ function RootTabs() {
     );
   }
 
-  if (
-    showCompletionSummary &&
-    !activeOuting &&
-    lastFinishedOuting &&
-    currentRoute === 'outing'
-  ) {
-    return <Redirect href="/summary" />;
-  }
-
   return (
     <View style={styles.appShell}>
       <CloudSyncBridge />
       <StorageWarning visible={persistenceError} />
 
       <Tabs
+        initialRouteName="home"
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: colors.text,
@@ -75,7 +49,7 @@ function RootTabs() {
         }}
       >
         <Tabs.Screen
-          name="index"
+          name="home"
           options={{
             title: 'Inicio',
             tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
@@ -89,7 +63,7 @@ function RootTabs() {
           }}
         />
         <Tabs.Screen
-          name="outing"
+          name="index"
           options={{
             title: activeOuting ? 'En curso' : 'Salida',
             tabBarLabelStyle: styles.recordLabel,
