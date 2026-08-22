@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { AuthProvider } from '@/features/auth/AuthContext';
 import { OutingSessionProvider, useOutingSession } from '@/features/outing/OutingSessionContext';
@@ -20,7 +21,39 @@ function StorageWarning({ visible }: { visible: boolean }) {
 }
 
 function RootTabs() {
-  const { activeOuting, isHydrated, persistenceError } = useOutingSession();
+  const {
+    activeOuting,
+    lastFinishedOuting,
+    showCompletionSummary,
+    isHydrated,
+    persistenceError,
+  } = useOutingSession();
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+    const normalizedPath = window.location.pathname.replace(/\/+$/, '');
+
+    // /outing no forma parte de RESAKA. Si una pestaña, favorito o build antiguo
+    // intenta recuperarlo, salimos de esa URL a nivel del navegador.
+    if (normalizedPath.endsWith('/outing')) {
+      window.location.replace('/resaka/home');
+      return;
+    }
+
+    // En GitHub Pages no dependemos de Expo Router para el salto crítico de
+    // "terminar salida -> resumen". Cuando finishOuting limpia la salida activa,
+    // hacemos una navegación real del navegador al resumen.
+    if (
+      isHydrated &&
+      showCompletionSummary &&
+      !activeOuting &&
+      lastFinishedOuting &&
+      (normalizedPath === '/resaka' || normalizedPath === '')
+    ) {
+      window.location.replace('/resaka/summary');
+    }
+  }, [activeOuting, isHydrated, lastFinishedOuting, showCompletionSummary]);
 
   if (!isHydrated) {
     return (
