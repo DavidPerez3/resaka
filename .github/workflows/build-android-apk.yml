@@ -16,7 +16,7 @@ on:
       - '.github/workflows/build-android-apk.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: resaka-android-mvp
@@ -69,18 +69,30 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  publish-release:
+    name: Publish installable APK
+    if: github.event_name != 'pull_request'
+    needs: build-apk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: RESAKA-MVP-Android
+
       - name: Replace previous MVP release
-        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release delete mvp-android-latest --cleanup-tag --yes || true
 
       - name: Publish installable MVP release
-        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create mvp-android-latest RESAKA-MVP.apk \
+            --repo "${{ github.repository }}" \
             --title "RESAKA MVP Android" \
             --notes "APK instalable de prueba. Build standalone con datos locales/offline, GPS foreground, Supabase y funcionalidades actuales de RESAKA. No es una release de Play Store." \
             --prerelease

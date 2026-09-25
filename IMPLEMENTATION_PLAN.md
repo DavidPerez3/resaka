@@ -178,7 +178,6 @@ src/
   - [x] Compartir PNG mediante Share Sheet nativo en Android/iOS
   - [x] Web Share API cuando esté disponible y descarga de imagen como fallback web
   - [ ] Botón `Compartir` desde el historial completo
-  - [ ] Plantilla 4:5 o cuadrada para publicaciones
   - [ ] Controles independientes para ocultar inicio/final y fecha
 - [ ] Prestigio de Barra y rangos
 - [ ] Logros y récords

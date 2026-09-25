@@ -179,7 +179,7 @@ export function ShareOutingModal({ visible, completed, onClose }: ShareOutingMod
                 ) : null}
               </View>
               <Text style={styles.photoHint}>
-                La foto se procesa en tu navegador para crear la imagen y no se guarda en la salida.
+                La foto se usa únicamente para crear la tarjeta en tu dispositivo y no se guarda en la salida.
               </Text>
           </>
 
