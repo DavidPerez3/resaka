@@ -1,4 +1,5 @@
 import type { Session, User } from '@supabase/supabase-js';
+import * as ExpoLinking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import {
   createContext,
@@ -60,6 +61,10 @@ function mapProfile(row: {
 function getWebRedirectUrl() {
   if (typeof window === 'undefined') return undefined;
   return `${window.location.origin}/resaka/profile`;
+}
+
+function getNativeRedirectUrl() {
+  return ExpoLinking.createURL('auth-callback', { scheme: 'resaka' });
 }
 
 function extractOAuthSession(url: string) {
@@ -174,7 +179,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const signUpWithEmail = useCallback(
     async (email: string, password: string, fullName?: string) => {
-      const redirectTo = Platform.OS === 'web' ? getWebRedirectUrl() : 'resaka://auth-callback';
+      const redirectTo = Platform.OS === 'web' ? getWebRedirectUrl() : getNativeRedirectUrl();
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -202,7 +207,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    const redirectTo = 'resaka://auth-callback';
+    const redirectTo = getNativeRedirectUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {

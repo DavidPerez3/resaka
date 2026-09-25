@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import Svg, { Circle, Line, Polyline } from 'react-native-svg';
 
 import { DrinkMapDetails } from '@/components/DrinkMapDetails';
 import {
@@ -19,15 +19,25 @@ type RouteMapProps = {
   endLabel?: string;
 };
 
-export function RouteMap({
-  points,
-  drinkClusters,
-  height = 220,
-  endLabel = 'Última posición',
-}: RouteMapProps) {
-  const mapRef = useRef<MapView | null>(null);
-  const { activeOuting, drinks, stops, knownVenues, lastFinishedOuting } = useOutingSession();
+type DrawablePoint = { x: number; y: number };
 
+function projectCoordinates(points: Array<{ latitude: number; longitude: number }>): DrawablePoint[] {
+  if (points.length === 0) return [];
+  const minLat = Math.min(...points.map((point) => point.latitude));
+  const maxLat = Math.max(...points.map((point) => point.latitude));
+  const minLon = Math.min(...points.map((point) => point.longitude));
+  const maxLon = Math.max(...points.map((point) => point.longitude));
+  const latRange = Math.max(maxLat - minLat, 0.000001);
+  const lonRange = Math.max(maxLon - minLon, 0.000001);
+
+  return points.map((point) => ({
+    x: 8 + ((point.longitude - minLon) / lonRange) * 84,
+    y: 8 + (1 - (point.latitude - minLat) / latRange) * 64,
+  }));
+}
+
+export function RouteMap({ points, drinkClusters, height = 220, endLabel = 'Última posición' }: RouteMapProps) {
+  const { activeOuting, drinks, stops, knownVenues, lastFinishedOuting } = useOutingSession();
   const sourceVenues = activeOuting ? knownVenues : (lastFinishedOuting?.venues ?? knownVenues);
   const sourceStops = activeOuting ? stops : (lastFinishedOuting?.stops ?? []);
 
@@ -41,53 +51,10 @@ export function RouteMap({
     );
   }, [activeOuting, drinkClusters, drinks, lastFinishedOuting, sourceVenues]);
 
-  const venueMarkers = useMemo(() => {
-    const venueById = new Map(sourceVenues.map((venue) => [venue.id, venue]));
-    const unique = new Map<string, { id: string; name: string; latitude: number; longitude: number }>();
-    for (const stop of sourceStops) {
-      const venue = venueById.get(stop.venueId);
-      if (venue) {
-        unique.set(venue.id, {
-          id: venue.id,
-          name: venue.name,
-          latitude: venue.latitude,
-          longitude: venue.longitude,
-        });
-      }
-    }
-    return Array.from(unique.values());
-  }, [sourceStops, sourceVenues]);
+  const route = useMemo(() => projectCoordinates(points), [points]);
+  const showDetails = !activeOuting && resolvedDrinkClusters.length > 0;
 
-  const coordinates = useMemo(
-    () => points.map((point) => ({ latitude: point.latitude, longitude: point.longitude })),
-    [points],
-  );
-
-  useEffect(() => {
-    if (coordinates.length === 0) return;
-
-    const timeout = setTimeout(() => {
-      if (coordinates.length === 1) {
-        mapRef.current?.animateToRegion(
-          {
-            ...coordinates[0],
-            latitudeDelta: 0.006,
-            longitudeDelta: 0.006,
-          },
-          350,
-        );
-      } else {
-        mapRef.current?.fitToCoordinates(coordinates, {
-          edgePadding: { top: 44, right: 44, bottom: 44, left: 44 },
-          animated: true,
-        });
-      }
-    }, 120);
-
-    return () => clearTimeout(timeout);
-  }, [coordinates]);
-
-  if (coordinates.length === 0) {
+  if (route.length === 0) {
     return (
       <View style={[styles.empty, { height }]}>
         <Text style={styles.emptyIcon}>📍</Text>
@@ -97,95 +64,44 @@ export function RouteMap({
     );
   }
 
-  const first = coordinates[0];
-  const last = coordinates[coordinates.length - 1];
-  const showDetails = !activeOuting && resolvedDrinkClusters.length > 0;
-
   return (
     <View style={styles.wrapper}>
-      <View style={[styles.frame, { height }]} pointerEvents="none">
-        <MapView
-          ref={mapRef}
-          style={StyleSheet.absoluteFill}
-          initialRegion={{
-            ...first,
-            latitudeDelta: 0.006,
-            longitudeDelta: 0.006,
-          }}
-          showsUserLocation
-          showsMyLocationButton={false}
-          toolbarEnabled={false}
-          scrollEnabled={false}
-          zoomEnabled={false}
-          rotateEnabled={false}
-          pitchEnabled={false}
-        >
-          {coordinates.length > 1 ? (
-            <Polyline coordinates={coordinates} strokeColor={colors.accent} strokeWidth={5} />
-          ) : null}
-
-          {venueMarkers.map((venue) => (
-            <Marker
-              key={`venue-${venue.id}`}
-              coordinate={{ latitude: venue.latitude, longitude: venue.longitude }}
-              title={venue.name}
-              tracksViewChanges={false}
-            >
-              <View style={styles.venueMarker}>
-                <Text style={styles.venueMarkerText}>📍</Text>
-              </View>
-            </Marker>
+      <View style={[styles.frame, { height }]}>
+        <Svg width="100%" height="100%" viewBox="0 0 100 80">
+          {[20, 40, 60, 80].map((value) => (
+            <Line key={`v-${value}`} x1={value} y1="0" x2={value} y2="80" stroke="#252B37" strokeWidth="0.35" />
           ))}
-
-          {resolvedDrinkClusters.map((cluster) => {
-            const tokens = buildDrinkClusterTokens(cluster);
-            return (
-              <Marker
-                key={cluster.id}
-                coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
-                tracksViewChanges={false}
-              >
-                <View style={styles.drinkMarker}>
-                  {tokens.map((token) => (
-                    <Text key={token} style={styles.drinkMarkerToken}>{token}</Text>
-                  ))}
-                </View>
-              </Marker>
-            );
-          })}
-
-          <Marker coordinate={first} title="Inicio" pinColor={colors.success} />
-          {coordinates.length > 1 ? (
-            <Marker coordinate={last} title={endLabel} pinColor={colors.accent} />
+          {[16, 32, 48, 64].map((value) => (
+            <Line key={`h-${value}`} x1="0" y1={value} x2="100" y2={value} stroke="#252B37" strokeWidth="0.35" />
+          ))}
+          {route.length > 1 ? (
+            <Polyline
+              points={route.map((point) => `${point.x},${point.y}`).join(' ')}
+              fill="none"
+              stroke={colors.accent}
+              strokeWidth="2.1"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           ) : null}
-        </MapView>
+          <Circle cx={route[0].x} cy={route[0].y} r="2.2" fill={colors.success} stroke="#fff" strokeWidth="0.7" />
+          {route.length > 1 ? (
+            <Circle cx={route.at(-1)?.x} cy={route.at(-1)?.y} r="2.2" fill={colors.accent} stroke="#fff" strokeWidth="0.7" />
+          ) : null}
+        </Svg>
 
         <View style={styles.legend}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, styles.startDot]} />
-            <Text style={styles.legendText}>Inicio</Text>
-          </View>
-          {coordinates.length > 1 ? (
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, styles.endDot]} />
-              <Text style={styles.legendText}>{endLabel}</Text>
-            </View>
-          ) : null}
-          {venueMarkers.length > 0 ? (
-            <View style={styles.legendItem}>
-              <Text style={styles.legendDrink}>📍</Text>
-              <Text style={styles.legendText}>Garito</Text>
-            </View>
-          ) : null}
+          <Text style={styles.legendText}>● Inicio</Text>
+          {route.length > 1 ? <Text style={styles.legendText}>● {endLabel}</Text> : null}
+          {sourceStops.length > 0 ? <Text style={styles.legendText}>📍 {sourceStops.length} garitos</Text> : null}
           {resolvedDrinkClusters.length > 0 ? (
-            <View style={styles.legendItem}>
-              <Text style={styles.legendDrink}>🍺</Text>
-              <Text style={styles.legendText}>Consumición</Text>
-            </View>
+            <Text style={styles.legendText}>
+              {resolvedDrinkClusters.flatMap(buildDrinkClusterTokens).slice(0, 4).join(' ')}
+            </Text>
           ) : null}
         </View>
+        <Text style={styles.safeMapLabel}>RECORRIDO GPS</Text>
       </View>
-
       {showDetails ? <DrinkMapDetails clusters={resolvedDrinkClusters} /> : null}
     </View>
   );
@@ -193,89 +109,13 @@ export function RouteMap({
 
 const styles = StyleSheet.create({
   wrapper: { gap: 13 },
-  frame: {
-    overflow: 'hidden',
-    borderRadius: 22,
-    backgroundColor: colors.surface,
-  },
-  venueMarker: {
-    width: 30,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 15,
-    backgroundColor: 'rgba(11,13,18,0.94)',
-    borderWidth: 2,
-    borderColor: colors.accent,
-  },
-  venueMarkerText: { fontSize: 15 },
-  drinkMarker: {
-    minHeight: 38,
-    paddingHorizontal: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    borderRadius: 19,
-    backgroundColor: 'rgba(11,13,18,0.95)',
-    borderWidth: 2,
-    borderColor: colors.text,
-  },
-  drinkMarkerToken: {
-    minWidth: 26,
-    color: colors.text,
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  legend: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 13,
-    backgroundColor: 'rgba(11,13,18,0.86)',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  legendDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-  },
-  startDot: { backgroundColor: colors.success },
-  endDot: { backgroundColor: colors.accent },
-  legendDrink: { fontSize: 11 },
-  legendText: {
-    color: colors.text,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  empty: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    borderRadius: 22,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+  frame: { overflow: 'hidden', borderRadius: 22, backgroundColor: '#111620', borderWidth: 1, borderColor: colors.border },
+  legend: { position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 9, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 13, backgroundColor: 'rgba(11,13,18,0.88)' },
+  legendText: { color: colors.text, fontSize: 9, fontWeight: '800' },
+  safeMapLabel: { position: 'absolute', right: 12, bottom: 10, color: colors.textMuted, fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
+  empty: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, borderRadius: 22, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   emptyIcon: { fontSize: 30 },
   emptyTitle: { marginTop: 10, color: colors.text, fontSize: 16, fontWeight: '900' },
-  emptyText: {
-    marginTop: 4,
-    maxWidth: 280,
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
-    textAlign: 'center',
-  },
+  emptyText: { marginTop: 4, maxWidth: 280, color: colors.textMuted, fontSize: 12, lineHeight: 17, textAlign: 'center' },
 });
+

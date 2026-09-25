@@ -27,7 +27,7 @@ class ExpoLocationTracker implements LocationTracker {
 
   async getCurrentPosition() {
     const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
+      accuracy: Location.Accuracy.Balanced,
     });
 
     return toLocationPoint(location);
@@ -36,9 +36,9 @@ class ExpoLocationTracker implements LocationTracker {
   async start(onPoint: (point: LocationPoint) => void): Promise<LocationSubscription> {
     const subscription = await Location.watchPositionAsync(
       {
-        accuracy: Location.Accuracy.High,
-        distanceInterval: 5,
-        timeInterval: 5000,
+        accuracy: Location.Accuracy.Balanced,
+        distanceInterval: 10,
+        timeInterval: 10_000,
       },
       (location) => onPoint(toLocationPoint(location)),
     );
