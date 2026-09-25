@@ -33,7 +33,14 @@
         {
           "experimentalLauncherActivity": false
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "RESAKA necesita acceso a tus fotos para usarlas como fondo de la tarjeta que compartes."
+        }
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -164,19 +164,22 @@ src/
 ## Bloques posteriores
 
 - [ ] Perfil e historial
-- [ ] Compartir salida en redes
-  - [ ] Botón `Compartir` desde resumen e historial
-  - [ ] Generar una imagen/tarjeta de la salida con branding RESAKA
-  - [ ] Plantilla vertical 9:16 para Stories/TikTok/WhatsApp
+- [x] Compartir salida en redes desde el último resumen
+  - [x] Botón `Compartir` desde resumen
+  - [x] Generar una imagen/tarjeta de la salida con branding RESAKA
+  - [x] Plantilla vertical 9:16 para Stories/TikTok/WhatsApp
   - [ ] Plantilla 4:5 o cuadrada para publicaciones
   - [ ] Mostrar datos seleccionables: duración, distancia, bebidas, garitos y fecha
   - [ ] Mostrar la ruta como elemento visual principal al estilo Strava
-  - [ ] Permitir elegir una foto del usuario como fondo y superponer los datos de RESAKA
-  - [ ] Alternativa sin foto con mapa/fondo oscuro de RESAKA
-  - [ ] Previsualización antes de compartir
-  - [ ] Controles de privacidad para ocultar ruta, inicio/final, garitos o consumiciones
-  - [ ] Compartir mediante Share Sheet nativo en Android/iOS
-  - [ ] Web Share API cuando esté disponible y descarga de imagen como fallback web
+  - [x] Permitir elegir una foto del usuario como fondo y superponer los datos de RESAKA
+  - [x] Alternativa sin foto con mapa/fondo oscuro de RESAKA
+  - [x] Previsualización antes de compartir
+  - [x] Controles de privacidad para ocultar ruta, garitos o consumiciones
+  - [x] Compartir PNG mediante Share Sheet nativo en Android/iOS
+  - [x] Web Share API cuando esté disponible y descarga de imagen como fallback web
+  - [ ] Botón `Compartir` desde el historial completo
+  - [ ] Plantilla 4:5 o cuadrada para publicaciones
+  - [ ] Controles independientes para ocultar inicio/final y fecha
 - [ ] Prestigio de Barra y rangos
 - [ ] Logros y récords
 - [ ] Currículum Etílico

@@ -2,6 +2,13 @@ name: Build Android MVP APK
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'app.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'src/**'
+      - '.github/workflows/build-android-apk.yml'
   push:
     branches:
       - main
@@ -37,7 +44,7 @@ jobs:
           java-version: '17'
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck
@@ -63,11 +70,13 @@ jobs:
           retention-days: 14
 
       - name: Replace previous MVP release
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release delete mvp-android-latest --cleanup-tag --yes || true
 
       - name: Publish installable MVP release
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

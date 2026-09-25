@@ -6,7 +6,7 @@ RESAKA es una app móvil social y humorística para registrar salidas: recorrido
 
 ## Estado actual
 
-Proyecto Expo + React Native + TypeScript + Expo Router con una primera experiencia local ya navegable:
+Proyecto Expo + React Native + TypeScript + Expo Router con un MVP web y Android funcional:
 
 - Home de RESAKA.
 - Navegación inferior: Inicio, Explorar, Salida, Cuadrillas y Perfil.
@@ -17,8 +17,13 @@ Proyecto Expo + React Native + TypeScript + Expo Router con una primera experien
 - Contadores locales por bebida.
 - Deshacer último registro.
 - Confirmación para terminar la salida.
+- Persistencia offline con AsyncStorage.
+- GPS foreground, ruta, distancia y mapas web/nativos.
+- Garitos reales mediante OpenStreetMap/Overpass.
+- Resumen final y tarjeta PNG 9:16 para compartir en web y Android/iOS.
+- Cuenta y sincronización de salidas terminadas mediante Supabase.
 
-Todavía no hay persistencia, GPS real, Supabase ni resumen final.
+Pendiente para la experiencia móvil completa: validar Google OAuth en Android, tracking en segundo plano e historial completo desde Supabase.
 
 ## Desarrollo
 
