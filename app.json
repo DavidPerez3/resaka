@@ -2,17 +2,18 @@
   "expo": {
     "name": "RESAKA",
     "slug": "resaka",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "orientation": "portrait",
     "scheme": "resaka",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.davidperez3.resaka"
     },
     "android": {
       "package": "com.davidperez3.resaka",
+      "versionCode": 2,
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
