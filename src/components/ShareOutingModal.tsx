@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -7,12 +7,15 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as Sharing from 'expo-sharing';
+import { captureRef } from 'react-native-view-shot';
 
+import { NativeShareCard } from '@/components/NativeShareCard';
 import type { CompletedOuting } from '@/features/outing/types';
 import {
   buildSharePreviewUri,
@@ -32,6 +35,7 @@ type ShareVisibilityKey = 'showRoute' | 'showDrinks' | 'showVenues';
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 export function ShareOutingModal({ visible, completed, onClose }: ShareOutingModalProps) {
+  const nativeCardRef = useRef<View>(null);
   const [options, setOptions] = useState<ShareCardOptions>({
     showRoute: true,
     showDrinks: true,
@@ -53,13 +57,13 @@ export function ShareOutingModal({ visible, completed, onClose }: ShareOutingMod
   };
 
   const handlePickPhoto = async () => {
-    if (Platform.OS !== 'web') return;
-
     setPhotoBusy(true);
     setMessage(null);
     setError(null);
     try {
-      const photo = await pickShareBackgroundPhotoWeb();
+      const photo = Platform.OS === 'web'
+        ? await pickShareBackgroundPhotoWeb()
+        : await pickShareBackgroundPhotoNative();
       if (photo) {
         setOptions((current) => ({ ...current, backgroundPhotoDataUrl: photo }));
       }
@@ -92,11 +96,22 @@ export function ShareOutingModal({ visible, completed, onClose }: ShareOutingMod
         return;
       }
 
-      await Share.share({
-        title: 'Mi salida en RESAKA',
-        message: `Mi salida en RESAKA: ${completed.drinks.length} bebidas · ${completed.stops.length} garitos. Los datos que no recordabas.`,
+      if (!nativeCardRef.current) throw new Error('La tarjeta todavía no está preparada.');
+      if (!(await Sharing.isAvailableAsync())) throw new Error('Este dispositivo no permite compartir archivos.');
+
+      const uri = await captureRef(nativeCardRef, {
+        format: 'png',
+        quality: 1,
+        width: 1080,
+        height: 1920,
+        result: 'tmpfile',
       });
-      setMessage('Compartido. La tarjeta PNG nativa se activará con la build de Android/iOS.');
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: 'Compartir salida de RESAKA',
+        UTI: 'public.png',
+      });
+      setMessage('Tarjeta compartida.');
     } catch (caught) {
       const text = caught instanceof Error ? caught.message : 'No se pudo compartir la salida.';
       if (!/abort|cancel/i.test(text)) setError(text);
@@ -126,19 +141,10 @@ export function ShareOutingModal({ visible, completed, onClose }: ShareOutingMod
           <View style={styles.previewFrame}>
             {Platform.OS === 'web' ? (
               <Image source={{ uri: previewUri }} resizeMode="contain" style={styles.previewImage} />
-            ) : (
-              <View style={styles.nativePreview}>
-                <Text style={styles.nativeBrand}>RESAKA</Text>
-                <Text style={styles.nativeTagline}>Toda noche deja rastro.</Text>
-                <Text style={styles.nativeMeta}>
-                  {completed.drinks.length} bebidas · {completed.stops.length} garitos
-                </Text>
-              </View>
-            )}
+            ) : <NativeShareCard ref={nativeCardRef} completed={completed} options={options} />}
           </View>
 
-          {Platform.OS === 'web' ? (
-            <>
+          <>
               <Text style={styles.optionsTitle}>FONDO</Text>
               <View style={styles.photoActions}>
                 <Pressable
@@ -173,10 +179,9 @@ export function ShareOutingModal({ visible, completed, onClose }: ShareOutingMod
                 ) : null}
               </View>
               <Text style={styles.photoHint}>
-                La foto se procesa en tu navegador para crear la imagen y no se guarda en la salida.
+                La foto se usa únicamente para crear la tarjeta en tu dispositivo y no se guarda en la salida.
               </Text>
-            </>
-          ) : null}
+          </>
 
           <Text style={styles.optionsTitle}>QUÉ QUIERES ENSEÑAR</Text>
           <View style={styles.optionRow}>
@@ -231,6 +236,18 @@ export function ShareOutingModal({ visible, completed, onClose }: ShareOutingMod
       </View>
     </Modal>
   );
+}
+
+async function pickShareBackgroundPhotoNative() {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) throw new Error('Necesitamos permiso para elegir una foto de la galería.');
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsEditing: false,
+    quality: 0.88,
+  });
+  return result.canceled ? null : result.assets[0]?.uri ?? null;
 }
 
 type ShareToggleProps = {
@@ -308,15 +325,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   previewImage: { width: '100%', height: '100%' },
-  nativePreview: {
-    flex: 1,
-    padding: 18,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.surfaceRaised,
-  },
-  nativeBrand: { color: colors.text, fontSize: 25, fontWeight: '900', letterSpacing: 2 },
-  nativeTagline: { marginTop: 8, color: colors.accent, fontSize: 18, fontWeight: '900' },
-  nativeMeta: { marginTop: 14, color: colors.textMuted, fontSize: 12, lineHeight: 18 },
   optionsTitle: { color: colors.textMuted, fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
   photoActions: { flexDirection: 'row', gap: 8 },
   photoButton: {
