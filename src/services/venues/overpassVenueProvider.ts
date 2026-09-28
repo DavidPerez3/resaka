@@ -9,7 +9,7 @@ const OVERPASS_URLS = [
   'https://overpass.nchc.org.tw/api/interpreter',
 ] as const;
 const DEFAULT_RADIUS_METERS = 500;
-const REQUEST_TIMEOUT_MS = 12_000;
+const REQUEST_TIMEOUT_MS = 4_000;
 const MAX_RESULTS = 30;
 const APP_USER_AGENT = 'RESAKA/0.1.2 (https://github.com/DavidPerez3/resaka)';
 
