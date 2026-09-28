@@ -3,10 +3,15 @@ import { venueDistanceFromPoint } from '@/domain/venues';
 import type { LocationPoint } from '@/services/location/types';
 import type { VenueProvider } from '@/services/venues/types';
 
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+const OVERPASS_URLS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.nchc.org.tw/api/interpreter',
+] as const;
 const DEFAULT_RADIUS_METERS = 500;
 const REQUEST_TIMEOUT_MS = 12_000;
 const MAX_RESULTS = 30;
+const APP_USER_AGENT = 'RESAKA/0.1.2 (https://github.com/DavidPerez3/resaka)';
 
 type OverpassElement = {
   type: 'node' | 'way' | 'relation';
@@ -73,45 +78,54 @@ out center tags;`;
 
 class OverpassVenueProvider implements VenueProvider {
   async searchNearby(point: LocationPoint, radiusMeters = DEFAULT_RADIUS_METERS) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const query = buildQuery(point, radiusMeters);
+    let lastError: unknown;
 
-    try {
-      const query = buildQuery(point, radiusMeters);
-      const response = await fetch(OVERPASS_URL, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-        },
-        body: `data=${encodeURIComponent(query)}`,
-        signal: controller.signal,
-      });
+    for (const endpoint of OVERPASS_URLS) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-      if (!response.ok) {
-        throw new Error(`OpenStreetMap respondió con ${response.status}.`);
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': APP_USER_AGENT,
+            Referer: 'https://github.com/DavidPerez3/resaka',
+          },
+          body: `data=${encodeURIComponent(query)}`,
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          lastError = new Error(`OpenStreetMap respondió con ${response.status}.`);
+          continue;
+        }
+
+        const payload = (await response.json()) as OverpassResponse;
+        const venues = (payload.elements ?? [])
+          .map(toVenue)
+          .filter((venue): venue is Venue => Boolean(venue));
+
+        const unique = new Map<string, Venue>();
+        for (const venue of venues) unique.set(venue.id, venue);
+
+        return Array.from(unique.values())
+          .map((venue) => ({ venue, distanceMeters: venueDistanceFromPoint(venue, point) }))
+          .sort((left, right) => left.distanceMeters - right.distanceMeters)
+          .slice(0, MAX_RESULTS);
+      } catch (error) {
+        lastError = error;
+      } finally {
+        clearTimeout(timeout);
       }
-
-      const payload = (await response.json()) as OverpassResponse;
-      const venues = (payload.elements ?? [])
-        .map(toVenue)
-        .filter((venue): venue is Venue => Boolean(venue));
-
-      const unique = new Map<string, Venue>();
-      for (const venue of venues) unique.set(venue.id, venue);
-
-      return Array.from(unique.values())
-        .map((venue) => ({ venue, distanceMeters: venueDistanceFromPoint(venue, point) }))
-        .sort((left, right) => left.distanceMeters - right.distanceMeters)
-        .slice(0, MAX_RESULTS);
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('La búsqueda de garitos ha tardado demasiado. Prueba otra vez.');
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeout);
     }
+
+    if (lastError instanceof Error && lastError.name === 'AbortError') {
+      throw new Error('La búsqueda de garitos ha tardado demasiado. Prueba otra vez.');
+    }
+    throw new Error('No se han podido cargar los garitos de OpenStreetMap. Prueba de nuevo en unos segundos.');
   }
 }
 
